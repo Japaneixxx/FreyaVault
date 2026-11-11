@@ -1,6 +1,5 @@
 package app.meufin.ui
 
-import android.graphics.Bitmap
 import android.Manifest
 import android.content.Intent
 import android.os.Build
@@ -17,7 +16,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -35,7 +33,6 @@ fun MoreScreen(vm: AppViewModel) {
     var confirmWipe by remember { mutableStateOf(false) }
     var showRules by remember { mutableStateOf(false) }
     val ctx = LocalContext.current
-    val view = LocalView.current
     val scope = rememberCoroutineScope()
 
     val csvExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
@@ -58,23 +55,6 @@ fun MoreScreen(vm: AppViewModel) {
                 ctx.contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) }
             }.getOrNull()
             if (text != null) vm.restoreBackup(text) else vm.message = "Não foi possível ler o arquivo"
-        }
-    }
-    val screenshotExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("image/png")) { uri ->
-        if (uri != null) {
-            runCatching {
-                val bitmap = captureView(view) ?: error("Tela indisponível")
-                try {
-                    ctx.contentResolver.openOutputStream(uri)?.use { output ->
-                        check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) {
-                            "Não foi possível gerar a imagem"
-                        }
-                    } ?: error("Não foi possível salvar a imagem")
-                    vm.message = "Print salvo"
-                } finally {
-                    bitmap.recycle()
-                }
-            }.onFailure { vm.message = "Não foi possível salvar o print" }
         }
     }
     val notifPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -112,7 +92,7 @@ fun MoreScreen(vm: AppViewModel) {
 
         SectionTitle("Segurança e avisos")
         NCard(Modifier.fillMaxWidth()) {
-            SwitchRow("Bloquear com biometria", "Pede digital, rosto ou PIN ao abrir. Também esconde o app nos recentes e oculta o widget.", vm.lockEnabled) { on ->
+            SwitchRow("Bloquear com biometria", "Pede digital, rosto ou PIN ao abrir.", vm.lockEnabled) { on ->
                 if (!on) vm.setLock(false)
                 else if (!Biometric.available(ctx)) vm.message = "Configure biometria ou bloqueio de tela no Android primeiro"
                 else {
@@ -156,10 +136,6 @@ fun MoreScreen(vm: AppViewModel) {
                     val i = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, vm.monthSummary()) }
                     ctx.startActivity(Intent.createChooser(i, "Compartilhar resumo do mês"))
                 }, modifier = Modifier.fillMaxWidth()) { Text("Compartilhar resumo do mês") }
-                OutlinedButton(
-                    onClick = { screenshotExporter.launch("meu-financeiro-${System.currentTimeMillis()}.png") },
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text("Salvar print da tela") }
                 OutlinedButton(onClick = { csvExporter.launch("meu-financeiro.csv") }, modifier = Modifier.fillMaxWidth()) {
                     Text("Exportar transações (CSV)")
                 }

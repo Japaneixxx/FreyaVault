@@ -1,7 +1,6 @@
 package app.meufin
 
 import android.os.Bundle
-import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.fragment.app.FragmentActivity
@@ -27,12 +26,8 @@ class MainActivity : FragmentActivity() {
 
     override fun onStart() {
         super.onStart()
-        // Com bloqueio ativo: esconde a tela no "recentes" e trava após 20s fora do app.
-        if (vm.settings.lockEnabled) {
-            window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-            if (stoppedAt > 0 && System.currentTimeMillis() - stoppedAt > 20_000) vm.locked = true
-        } else {
-            window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        if (vm.settings.lockEnabled && stoppedAt > 0 && System.currentTimeMillis() - stoppedAt > 20_000) {
+            vm.locked = true
         }
         vm.syncIfStale()
     }
