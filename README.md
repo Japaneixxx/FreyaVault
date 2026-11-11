@@ -75,3 +75,10 @@ Pluggy (se vier) -> palavras-chave locais (Categorizer.kt) -> regra aprendida ao
 - Planejar: "quanto posso gastar por dia" até o fim do mês e avatares nas recorrências.
 - Insight do dia da semana com maior gasto.
 
+## Atualizações
+Ao abrir o app, ele consulta a Release mais recente deste repositório. Quando houver
+um APK novo, o app oferece o download e abre o instalador oficial do Android para
+confirmar a atualização. A instalação silenciosa não é permitida para apps comuns;
+use a mesma chave de assinatura das Releases anteriores. Essa verificação fica
+habilitada por padrão e pode ser desligada em **Mais > Segurança e avisos**.
+

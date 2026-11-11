@@ -1,6 +1,10 @@
 package app.meufin
 
 import android.os.Bundle
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.fragment.app.FragmentActivity
@@ -15,7 +19,9 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            AppTheme(vm.themeMode) { App(vm, onUnlock = { unlock() }) }
+            AppTheme(vm.themeMode) {
+                App(vm, onUnlock = { unlock() }, onInstallUpdate = { installUpdate(it) })
+            }
         }
         if (vm.settings.alertsEnabled) Alerts.schedule(this, true)
     }
@@ -30,10 +36,29 @@ class MainActivity : FragmentActivity() {
             vm.locked = true
         }
         vm.syncIfStale()
+        if (vm.checkUpdatesOnOpen) vm.checkForUpdate(showNoUpdate = false)
     }
 
     override fun onStop() {
         super.onStop()
         stoppedAt = System.currentTimeMillis()
+    }
+
+    private fun installUpdate(uri: Uri) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            !packageManager.canRequestPackageInstalls()
+        ) {
+            startActivity(
+                Intent(
+                    Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                    Uri.parse("package:$packageName")
+                )
+            )
+            return
+        }
+        startActivity(Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/vnd.android.package-archive")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        })
     }
 }

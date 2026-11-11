@@ -11,7 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun App(vm: AppViewModel, onUnlock: () -> Unit) {
+fun App(vm: AppViewModel, onUnlock: () -> Unit, onInstallUpdate: (android.net.Uri) -> Unit) {
     if (!vm.configured) {
         SetupScreen(vm)
         return
@@ -28,6 +28,20 @@ fun App(vm: AppViewModel, onUnlock: () -> Unit) {
             snack.showSnackbar(it)
             vm.message = null
         }
+    }
+    vm.updateRelease?.let { release ->
+        AlertDialog(
+            onDismissRequest = { vm.updateRelease = null },
+            title = { Text("Atualização disponível") },
+            text = { Text("A versão ${release.version} está disponível. O APK será baixado e o Android pedirá confirmação para instalar.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    vm.downloadUpdate(onInstallUpdate)
+                    vm.updateRelease = null
+                }) { Text(if (vm.downloadingUpdate) "Baixando…" else "Atualizar") }
+            },
+            dismissButton = { TextButton(onClick = { vm.updateRelease = null }) { Text("Agora não") } }
+        )
     }
 
     Scaffold(
