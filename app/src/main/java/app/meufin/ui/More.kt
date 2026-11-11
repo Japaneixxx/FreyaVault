@@ -124,6 +124,12 @@ fun MoreScreen(vm: AppViewModel) {
                 else vm.setAlerts(true)
             }
             Spacer(Modifier.height(10.dp))
+            SwitchRow(
+                "Verificar atualizações ao abrir",
+                "Consulta automaticamente as Releases do GitHub sempre que o app é aberto.",
+                vm.checkUpdatesOnOpen
+            ) { vm.setCheckUpdatesOnOpen(it) }
+            Spacer(Modifier.height(10.dp))
             SwitchRow("Ocultar valores", "Esconde saldos e valores em todo o app.", Privacy.hidden) { vm.toggleHide() }
         }
 
@@ -145,6 +151,13 @@ fun MoreScreen(vm: AppViewModel) {
             )
             Spacer(Modifier.height(8.dp))
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedButton(
+                    onClick = { vm.checkForUpdate() },
+                    enabled = !vm.checkingUpdate && !vm.downloadingUpdate,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(if (vm.checkingUpdate) "Verificando atualizações…" else "Verificar atualizações")
+                }
                 OutlinedButton(onClick = { vm.sync() }, enabled = !vm.syncing, modifier = Modifier.fillMaxWidth()) {
                     Text(if (vm.syncing) "Sincronizando…" else "Sincronizar agora")
                 }

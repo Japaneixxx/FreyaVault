@@ -30,6 +30,9 @@ class Settings(ctx: Context) {
     var hideValues: Boolean get() = bool("hide"); set(v) = put("hide", v)
     var lockEnabled: Boolean get() = bool("lock"); set(v) = put("lock", v)
     var alertsEnabled: Boolean get() = bool("alerts"); set(v) = put("alerts", v)
+    var checkUpdatesOnOpen: Boolean
+        get() = prefs.getBoolean("check_updates_on_open", true)
+        set(v) = put("check_updates_on_open", v)
 
     /** 0 = sistema, 1 = claro, 2 = escuro */
     var themeMode: Int

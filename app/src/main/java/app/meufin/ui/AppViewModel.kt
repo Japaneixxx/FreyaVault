@@ -19,6 +19,7 @@ import kotlinx.coroutines.withContext
 import java.net.UnknownHostException
 import java.util.Locale
 import java.util.UUID
+import android.net.Uri
 
 data class TxItem(
     val tx: Tx,
@@ -58,7 +59,11 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     var locked by mutableStateOf(settings.lockEnabled)
     var lockEnabled by mutableStateOf(settings.lockEnabled)
     var alertsEnabled by mutableStateOf(settings.alertsEnabled)
+    var checkUpdatesOnOpen by mutableStateOf(settings.checkUpdatesOnOpen)
     var themeMode by mutableStateOf(settings.themeMode)
+    var updateRelease by mutableStateOf<UpdateRelease?>(null)
+    var checkingUpdate by mutableStateOf(false)
+    var downloadingUpdate by mutableStateOf(false)
 
     fun saveCredentials(clientId: String, secret: String, itemIds: String) {
         settings.clientId = clientId
@@ -93,6 +98,38 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun checkForUpdate(showNoUpdate: Boolean = true) {
+        if (!configured || checkingUpdate || downloadingUpdate) return
+        viewModelScope.launch {
+            checkingUpdate = true
+            try {
+                updateRelease = Updater.check()
+                if (showNoUpdate && updateRelease == null) {
+                    message = "Você já está usando a versão mais recente"
+                }
+            } catch (e: Exception) {
+                message = e.message ?: "Não foi possível verificar atualizações"
+            } finally {
+                checkingUpdate = false
+            }
+        }
+    }
+
+    fun downloadUpdate(onReady: (Uri) -> Unit) {
+        val release = updateRelease ?: return
+        if (downloadingUpdate) return
+        viewModelScope.launch {
+            downloadingUpdate = true
+            try {
+                onReady(Updater.download(app, release))
+            } catch (e: Exception) {
+                message = e.message ?: "Não foi possível baixar a atualização"
+            } finally {
+                downloadingUpdate = false
+            }
+        }
+    }
+
     // ----- preferências -----
     fun toggleHide() {
         Privacy.hidden = !Privacy.hidden
@@ -111,6 +148,11 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
         alertsEnabled = enabled
         Alerts.schedule(app, enabled)
         if (enabled) viewModelScope.launch { Alerts.check(app) }
+    }
+
+    fun setCheckUpdatesOnOpen(enabled: Boolean) {
+        settings.checkUpdatesOnOpen = enabled
+        checkUpdatesOnOpen = enabled
     }
 
     fun setTheme(mode: Int) {
