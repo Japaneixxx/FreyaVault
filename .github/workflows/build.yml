@@ -29,13 +29,11 @@ jobs:
         shell: bash
         run: |
           version_name=$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts)
-          version_code=$(sed -n 's/.*versionCode = \([0-9][0-9]*\).*/\1/p' app/build.gradle.kts)
-          if [ -z "$version_name" ] || [ -z "$version_code" ]; then
-            echo "Could not read versionName/versionCode from app/build.gradle.kts" >&2
+          if [[ ! "$version_name" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "versionName must follow Major.Minor.Bug (for example, 1.2.0)" >&2
             exit 1
           fi
           echo "name=$version_name" >> "$GITHUB_OUTPUT"
-          echo "code=$version_code" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         with:
           name: MeuFinanceiro-apk
@@ -43,8 +41,8 @@ jobs:
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.app-version.outputs.name }}+${{ steps.app-version.outputs.code }}
-          name: Meu Financeiro v${{ steps.app-version.outputs.name }}+${{ steps.app-version.outputs.code }}
+          tag_name: v${{ steps.app-version.outputs.name }}
+          name: Meu Financeiro v${{ steps.app-version.outputs.name }}
           target_commitish: ${{ github.sha }}
           generate_release_notes: true
           files: app/build/outputs/apk/debug/app-debug.apk
