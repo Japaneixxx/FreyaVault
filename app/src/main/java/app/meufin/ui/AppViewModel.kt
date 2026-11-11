@@ -150,7 +150,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
         if (enabled) viewModelScope.launch { Alerts.check(app) }
     }
 
-    fun setCheckUpdatesOnOpen(enabled: Boolean) {
+    fun updateCheckUpdatesOnOpen(enabled: Boolean) {
         settings.checkUpdatesOnOpen = enabled
         checkUpdatesOnOpen = enabled
     }
