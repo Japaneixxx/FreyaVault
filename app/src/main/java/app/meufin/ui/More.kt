@@ -128,7 +128,7 @@ fun MoreScreen(vm: AppViewModel) {
                 "Verificar atualizações ao abrir",
                 "Consulta automaticamente as Releases do GitHub sempre que o app é aberto.",
                 vm.checkUpdatesOnOpen
-            ) { vm.setCheckUpdatesOnOpen(it) }
+            ) { vm.updateCheckUpdatesOnOpen(it) }
             Spacer(Modifier.height(10.dp))
             SwitchRow("Ocultar valores", "Esconde saldos e valores em todo o app.", Privacy.hidden) { vm.toggleHide() }
         }
