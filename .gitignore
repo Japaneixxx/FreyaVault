@@ -5,6 +5,9 @@ build/
 
 # Local configuration
 local.properties
+*.keystore
+*.jks
+*.p12
 
 # Android Studio / IntelliJ
 .idea/

@@ -5,11 +5,29 @@ plugins {
 }
 
 android {
-    namespace = "app.meufin"
+    namespace = "japaneixxx.freya"
     compileSdk = 34
 
+    val releaseKeystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
+    val releaseKeystorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+    val releaseKeyAlias = System.getenv("ANDROID_KEY_ALIAS")
+    val releaseKeyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+
+    signingConfigs {
+        create("release") {
+            if (releaseKeystorePath != null && releaseKeystorePassword != null &&
+                releaseKeyAlias != null && releaseKeyPassword != null
+            ) {
+                storeFile = file(releaseKeystorePath)
+                storePassword = releaseKeystorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     defaultConfig {
-        applicationId = "app.meufin"
+        applicationId = "japaneixxx.freya"
         minSdk = 26
         targetSdk = 34
         versionCode = 4
@@ -19,6 +37,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = true
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }

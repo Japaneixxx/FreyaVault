@@ -29,6 +29,8 @@
 - Atualize `versionCode` e `versionName` em `app/build.gradle.kts` juntos; o `versionCode` deve sempre aumentar.
 - O workflow valida `versionName` e publica a Release com a tag `v<Major>.<Minor>.<Bug>`.
 - Use `push` para `main` ou `master` somente quando quiser disparar a publicação automática do APK.
+- Releases devem usar o keystore permanente configurado pelos secrets do GitHub; nunca crie ou versione chaves de assinatura no repositório.
+- Não troque `assembleRelease` por `assembleDebug` no workflow de publicação, pois isso pode gerar APKs incompatíveis para atualização.
 
 ## Build e validação
 
