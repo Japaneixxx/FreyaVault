@@ -102,4 +102,7 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier) {
     Text(
         text.uppercase(),
         modifier = modifier,
-        style = MaterialTheme.typography.labelMedium.copy(letterSpac
+        style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+}

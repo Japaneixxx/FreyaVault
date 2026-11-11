@@ -29,3 +29,12 @@ Pluggy (se vier) -> palavras-chave locais (Categorizer.kt) -> regra aprendida ao
 - Planejar: orçamentos por categoria (com sugestão automática), metas de poupança, cobranças recorrentes detectadas.
 - Mais: contas, modo privacidade (ocultar valores), exportar CSV, credenciais.
 - Atualizar da v1.0 limpa o banco local uma vez (tudo é re-sincronizado); credenciais são mantidas.
+
+## v1.2
+- Bloqueio por biometria/PIN (também esconde o app nos recentes e o widget).
+- Alertas locais: orçamento a 80%/100%, contas a pagar e fatura de cartão a vencer (checagem após cada sincronização + 1x/dia às 9h via WorkManager, sem rede).
+- Widget de saldo na tela inicial.
+- Contas a pagar, cartões (limite/fatura/vencimento), parcelas detectadas, evolução do saldo, previsão de fim de mês.
+- Filtro por conta no extrato, tema claro/escuro/sistema, regras de categoria gerenciáveis.
+- Backup/restauração em JSON, compartilhar resumo do mês, ícone do app.
+- Banco migra de v2 para v3 sem perder dados.

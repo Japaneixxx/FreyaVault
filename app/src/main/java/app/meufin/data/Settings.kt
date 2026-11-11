@@ -32,4 +32,25 @@ class Settings(ctx: Context) {
     var alertsEnabled: Boolean get() = bool("alerts"); set(v) = put("alerts", v)
 
     /** 0 = sistema, 1 = claro, 2 = escuro */
-    var t
+    var themeMode: Int
+        get() = prefs.getInt("theme", 0)
+        set(v) { prefs.edit().putInt("theme", v).apply() }
+
+    // usados pelo widget
+    var widgetBank: Double
+        get() = str("w_bank").toDoubleOrNull() ?: 0.0
+        set(v) = put("w_bank", v.toString())
+    var widgetCards: Double
+        get() = str("w_cards").toDoubleOrNull() ?: 0.0
+        set(v) = put("w_cards", v.toString())
+
+    // evita notificar a mesma coisa duas vezes
+    fun seen(key: String): Boolean = bool("seen_$key")
+    fun markSeen(key: String) = put("seen_$key", true)
+
+    val configured: Boolean
+        get() = clientId.isNotBlank() && clientSecret.isNotBlank() && itemList().isNotEmpty()
+
+    fun itemList(): List<String> =
+        itemIds.split(Regex("[,;\\s]+")).map { it.trim() }.filter { it.isNotBlank() }.distinct()
+}

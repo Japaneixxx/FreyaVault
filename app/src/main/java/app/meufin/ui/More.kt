@@ -153,4 +153,121 @@ fun MoreScreen(vm: AppViewModel) {
             )
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-   
+                OutlinedButton(onClick = { backupExporter.launch("meu-financeiro-backup.json") }) { Text("Salvar backup") }
+                OutlinedButton(onClick = { backupImporter.launch(arrayOf("application/json", "*/*")) }) { Text("Restaurar") }
+            }
+            Spacer(Modifier.height(6.dp))
+            OutlinedButton(onClick = { confirmWipe = true }, modifier = Modifier.fillMaxWidth()) {
+                Text("Apagar dados locais")
+            }
+        }
+
+        SectionTitle("Credenciais Pluggy")
+        NCard(Modifier.fillMaxWidth()) { CredentialsForm(vm, "Salvar e sincronizar") }
+    }
+
+    if (confirmWipe) {
+        AlertDialog(
+            onDismissRequest = { confirmWipe = false },
+            title = { Text("Apagar dados locais?") },
+            text = { Text("Remove contas, transações, categorias, orçamentos, metas e contas a pagar do aparelho. Faça um backup antes. Suas credenciais continuam salvas.") },
+            confirmButton = { TextButton(onClick = { vm.wipeLocalData(); confirmWipe = false }) { Text("Apagar") } },
+            dismissButton = { TextButton(onClick = { confirmWipe = false }) { Text("Cancelar") } }
+        )
+    }
+    if (showRules) {
+        AlertDialog(
+            onDismissRequest = { showRules = false },
+            title = { Text("Regras de categoria") },
+            confirmButton = { TextButton(onClick = { showRules = false }) { Text("Fechar") } },
+            text = {
+                if (rules.isEmpty()) {
+                    Text("Nenhuma regra ainda. Ao trocar a categoria de uma transação, o app aprende e aplica às parecidas.")
+                } else {
+                    LazyColumn(Modifier.heightIn(max = 380.dp)) {
+                        items(rules.sortedBy { it.ruleKey }, key = { it.ruleKey }) { r ->
+                            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(r.ruleKey, maxLines = 1, style = MaterialTheme.typography.bodyMedium)
+                                    Text("→ ${r.category}", style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                TextButton(onClick = { vm.deleteRule(r.ruleKey) }) { Text("Remover") }
+                            }
+                        }
+                    }
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun SwitchRow(title: String, subtitle: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(title)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = checked, onCheckedChange = onChange)
+    }
+}
+
+@Composable
+fun SetupScreen(vm: AppViewModel) {
+    Scaffold { pad ->
+        Column(Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp)) {
+            Text("Meu Financeiro", style = MaterialTheme.typography.headlineLarge)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Seus dados ficam só neste aparelho. As credenciais são guardadas criptografadas e o app fala direto com o Pluggy.",
+                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(20.dp))
+            NCard(Modifier.fillMaxWidth(), container = MaterialTheme.colorScheme.primaryContainer) {
+                Text(
+                    "1. Conecte seus bancos em meu.pluggy.ai\n" +
+                        "2. No dashboard.pluggy.ai, crie uma Application, abra a tela Demo e conecte o conector MeuPluggy\n" +
+                        "3. Copie o Client ID, o Client Secret e o Item ID de cada banco (até 5)",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+            Spacer(Modifier.height(20.dp))
+            CredentialsForm(vm, "Conectar")
+            if (vm.syncing) {
+                Spacer(Modifier.height(12.dp))
+                LinearProgressIndicator(Modifier.fillMaxWidth())
+            }
+            vm.message?.let {
+                Spacer(Modifier.height(12.dp))
+                Text(it, color = MaterialTheme.colorScheme.error)
+            }
+        }
+    }
+}
+
+@Composable
+fun CredentialsForm(vm: AppViewModel, buttonLabel: String) {
+    var cid by remember { mutableStateOf(vm.settings.clientId) }
+    var secret by remember { mutableStateOf(vm.settings.clientSecret) }
+    var items by remember { mutableStateOf(vm.settings.itemIds) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(cid, { cid = it }, label = { Text("Client ID") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(
+            secret, { secret = it }, label = { Text("Client Secret") }, singleLine = true,
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            modifier = Modifier.fillMaxWidth()
+        )
+        OutlinedTextField(
+            items, { items = it }, label = { Text("Item IDs (vírgula ou linha)") },
+            minLines = 2, modifier = Modifier.fillMaxWidth()
+        )
+        Button(
+            onClick = { vm.saveCredentials(cid.trim(), secret.trim(), items.trim()) },
+            enabled = cid.isNotBlank() && secret.isNotBlank() && items.isNotBlank() && !vm.syncing,
+            modifier = Modifier.fillMaxWidth()
+        ) { Text(buttonLabel) }
+    }
+}

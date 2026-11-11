@@ -12,8 +12,8 @@ android {
         applicationId = "app.meufin"
         minSdk = 26
         targetSdk = 34
-        versionCode = 2
-        versionName = "1.1"
+        versionCode = 3
+        versionName = "1.2"
     }
 
     buildTypes {
@@ -49,4 +49,6 @@ dependencies {
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    implementation("androidx.biometric:biometric:1.1.0")
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
 }

@@ -93,4 +93,64 @@ interface FinDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putRule(rule: Rule)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putBudget(b: Budget)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putGoal(g: Goal)
-    @Insert(onConflict = OnCo
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putMeta(m: TxMeta)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putBill(b: Bill)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putSnapshot(s: Snapshot)
+
+    @Query("SELECT MAX(date) FROM transactions WHERE accountId = :accountId")
+    suspend fun lastDate(accountId: String): String?
+
+    @Query("DELETE FROM transactions WHERE accountId = :accountId AND pending = 1")
+    suspend fun deletePending(accountId: String)
+
+    @Query("DELETE FROM transactions WHERE id = :id") suspend fun deleteTx(id: String)
+    @Query("DELETE FROM rules WHERE ruleKey = :key") suspend fun deleteRule(key: String)
+    @Query("DELETE FROM budgets WHERE category = :c") suspend fun deleteBudget(c: String)
+    @Query("DELETE FROM goals WHERE id = :id") suspend fun deleteGoal(id: Long)
+    @Query("DELETE FROM bills WHERE id = :id") suspend fun deleteBill(id: Long)
+
+    @Query("DELETE FROM accounts") suspend fun clearAccounts()
+    @Query("DELETE FROM transactions") suspend fun clearTx()
+    @Query("DELETE FROM rules") suspend fun clearRules()
+    @Query("DELETE FROM budgets") suspend fun clearBudgets()
+    @Query("DELETE FROM goals") suspend fun clearGoals()
+    @Query("DELETE FROM tx_meta") suspend fun clearMetas()
+    @Query("DELETE FROM bills") suspend fun clearBills()
+    @Query("DELETE FROM snapshots") suspend fun clearSnapshots()
+}
+
+private val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE accounts ADD COLUMN creditLimit REAL")
+        db.execSQL("ALTER TABLE accounts ADD COLUMN availableLimit REAL")
+        db.execSQL("ALTER TABLE accounts ADD COLUMN dueDate TEXT")
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `bills` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "`name` TEXT NOT NULL, `amount` REAL NOT NULL, `dueDay` INTEGER NOT NULL, " +
+                "`lastPaidMonth` TEXT NOT NULL)"
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `snapshots` (`date` TEXT NOT NULL, `bank` REAL NOT NULL, " +
+                "`cards` REAL NOT NULL, PRIMARY KEY(`date`))"
+        )
+    }
+}
+
+@Database(
+    entities = [Account::class, Tx::class, Rule::class, Budget::class, Goal::class,
+        TxMeta::class, Bill::class, Snapshot::class],
+    version = 3, exportSchema = false
+)
+abstract class Db : RoomDatabase() {
+    abstract fun dao(): FinDao
+
+    companion object {
+        @Volatile private var inst: Db? = null
+        fun get(ctx: Context): Db = inst ?: synchronized(this) {
+            inst ?: Room.databaseBuilder(ctx.applicationContext, Db::class.java, "fin.db")
+                .addMigrations(MIGRATION_2_3)
+                .fallbackToDestructiveMigrationFrom(1) // v1 só tinha dados re-sincronizáveis
+                .build().also { inst = it }
+        }
+    }
+}

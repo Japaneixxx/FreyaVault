@@ -217,3 +217,75 @@ fun HomeScreen(vm: AppViewModel, goPlan: () -> Unit) {
             NCard(Modifier.fillMaxWidth()) {
                 SectionTitle("Orçamentos")
                 Spacer(Modifier.height(8.dp))
+                if (budgetRows.isEmpty()) {
+                    Text("Defina limites por categoria para acompanhar seus gastos.", style = MaterialTheme.typography.bodyMedium)
+                    TextButton(onClick = goPlan) { Text("Criar orçamentos") }
+                } else {
+                    budgetRows.forEach { (cat, spent, limit) -> BudgetBar(cat, spent, limit) }
+                    TextButton(onClick = goPlan) { Text("Ver todos") }
+                }
+            }
+        }
+        item {
+            NCard(Modifier.fillMaxWidth()) {
+                SectionTitle("Últimos 6 meses")
+                Spacer(Modifier.height(12.dp))
+                MonthlyBars(last6)
+            }
+        }
+        if (topTx.isNotEmpty()) item {
+            NCard(Modifier.fillMaxWidth()) {
+                SectionTitle("Maiores gastos do mês")
+                Spacer(Modifier.height(8.dp))
+                topTx.forEach {
+                    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(it.tx.description, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
+                            Text(it.category, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Text(money(it.tx.amount), color = ExpenseColor, fontWeight = FontWeight.Medium)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun BudgetBar(category: String, spent: Double, limit: Double, onClick: (() -> Unit)? = null) {
+    val frac = if (limit > 0) (spent / limit).toFloat() else 0f
+    val color = when {
+        frac >= 1f -> ExpenseColor
+        frac >= 0.8f -> WarnColor
+        else -> IncomeColor
+    }
+    val mod = if (onClick != null) Modifier.fillMaxWidth().clickable(onClick = onClick) else Modifier.fillMaxWidth()
+    Column(mod.padding(vertical = 8.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(category, style = MaterialTheme.typography.bodyMedium)
+            Text("${money(spent)} / ${money(limit)}", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Spacer(Modifier.height(6.dp))
+        LinearProgressIndicator(
+            progress = { frac.coerceIn(0f, 1f) },
+            color = color,
+            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+            modifier = Modifier.fillMaxWidth().height(8.dp)
+        )
+        if (frac >= 1f) {
+            Text("Estourou em ${money(spent - limit)}", style = MaterialTheme.typography.labelSmall, color = ExpenseColor,
+                modifier = Modifier.padding(top = 4.dp))
+        }
+    }
+}
+
+@Composable
+private fun StatCard(title: String, value: String, color: Color, modifier: Modifier) {
+    NCard(modifier) {
+        Text(title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(4.dp))
+        Text(value, style = MaterialTheme.typography.titleLarge, color = color)
+    }
+}

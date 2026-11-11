@@ -61,4 +61,23 @@ class Repository(private val settings: Settings, private val dao: FinDao) {
                             .ifBlank { "Sem descrição" },
                         amount = signed,
                         pluggyCategory = o.str("category"),
-                        pendin
+                        pending = o.str("status") == "PENDING"
+                    )
+                }
+
+                dao.deletePending(acc.id) // pendentes mudam de id ao serem efetivadas
+                val res = dao.insertTx(txs)
+                val existing = txs.filterIndexed { i, _ -> res[i] == -1L }
+                if (existing.isNotEmpty()) dao.updateTx(existing)
+            }
+        }
+
+        val bank = allAccounts.filter { it.type == "BANK" }.sumOf { it.balance }
+        val cards = allAccounts.filter { it.type == "CREDIT" }.sumOf { it.balance }
+        dao.putSnapshot(Snapshot(LocalDate.now().toString(), bank, cards))
+        settings.widgetBank = bank
+        settings.widgetCards = cards
+        settings.lastSync = System.currentTimeMillis()
+        warnings
+    }
+}

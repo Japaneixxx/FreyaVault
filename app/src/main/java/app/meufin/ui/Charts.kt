@@ -98,3 +98,30 @@ fun CumulativeChart(cur: List<Float>, prev: List<Float>, totalDays: Int, modifie
         line(cur, maxV, totalDays, c1, 6f)
     }
 }
+
+/** Linha simples com os valores normalizados entre mínimo e máximo (ex.: evolução do saldo). */
+@Composable
+fun TrendChart(values: List<Double>, modifier: Modifier = Modifier) {
+    if (values.size < 2) return
+    val lo = values.min(); val hi = values.max()
+    val range = (hi - lo).coerceAtLeast(1.0)
+    val color = MaterialTheme.colorScheme.primary
+    val fill = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+    Canvas(modifier.fillMaxWidth().height(110.dp)) {
+        val pts = values.mapIndexed { i, v ->
+            Offset(size.width * i / (values.size - 1), (size.height - ((v - lo) / range).toFloat() * (size.height - 8f)) - 4f)
+        }
+        val area = Path().apply {
+            moveTo(pts.first().x, size.height)
+            pts.forEach { lineTo(it.x, it.y) }
+            lineTo(pts.last().x, size.height)
+            close()
+        }
+        drawPath(area, fill)
+        val path = Path().apply {
+            moveTo(pts.first().x, pts.first().y)
+            pts.drop(1).forEach { lineTo(it.x, it.y) }
+        }
+        drawPath(path, color, style = Stroke(5f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+    }
+}

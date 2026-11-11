@@ -38,4 +38,7 @@ fun ago(ms: Long): String {
     return when {
         m < 1 -> "agora"
         m < 60 -> "há $m min"
-        m < 1440 -> "há ${m / 
+        m < 1440 -> "há ${m / 60} h"
+        else -> "há ${m / 1440} d"
+    }
+}

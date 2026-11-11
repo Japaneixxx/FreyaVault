@@ -206,4 +206,14 @@ private fun AddDialog(vm: AppViewModel, onClose: () -> Unit) {
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = expense, onClick = { expense = true }, label = { Text("De
+                    FilterChip(selected = expense, onClick = { expense = true }, label = { Text("Despesa") })
+                    FilterChip(selected = !expense, onClick = { expense = false }, label = { Text("Receita") })
+                }
+                OutlinedTextField(desc, { desc = it }, label = { Text("Descrição") }, singleLine = true)
+                OutlinedTextField(value, { value = it }, label = { Text("Valor (R$)") }, singleLine = true)
+                OutlinedTextField(date, { date = it }, label = { Text("Data (AAAA-MM-DD)") }, singleLine = true, isError = !dateOk)
+                CategoryPicker(cat, ALL_CATEGORIES) { cat = it }
+            }
+        }
+    )
+}

@@ -78,4 +78,90 @@ fun detectRecurring(txs: List<TxItem>): List<Recurring> {
             val avg = amounts.average()
             val stable = amounts.count { abs(it - avg) <= avg * 0.2 } >= amounts.size * 0.7
             val last = l.maxOf { it.tx.date }
-            if (!stable || last 
+            if (!stable || last < minDate) return@mapNotNull null
+            Recurring(l.first().tx.description, l.first().category, avg, months.size, last)
+        }
+        .sortedByDescending { it.avg }
+}
+
+/** Aplica regras de categoria e anotações às transações. */
+fun buildItems(txs: List<Tx>, rules: List<Rule>, metas: List<TxMeta>): List<TxItem> {
+    val ruleMap = rules.associate { it.ruleKey to it.category }
+    val metaMap = metas.associateBy { it.txId }
+    return txs.map {
+        val m = metaMap[it.id]
+        TxItem(it, categorize(it, ruleMap), m?.note.orEmpty(), m?.ignored ?: false)
+    }
+}
+
+// ---------------- Parcelamentos ----------------
+data class Installment(
+    val name: String, val category: String, val amount: Double,
+    val current: Int, val total: Int, val lastDate: String
+) {
+    val remaining: Int get() = (total - current).coerceAtLeast(0)
+    val remainingAmount: Double get() = remaining * amount
+}
+
+private val instRegex = Regex("""(?<!\d)(\d{1,2})\s*/\s*(\d{1,2})(?!\d)""")
+
+/** Detecta compras parceladas pelo padrão "03/10" na descrição. */
+fun detectInstallments(txs: List<TxItem>): List<Installment> {
+    val minDate = LocalDate.now().minusDays(75).toString()
+    data class Hit(val item: TxItem, val cur: Int, val tot: Int)
+    val hits = txs.filter { it.tx.amount < 0 && !it.manual }.mapNotNull { t ->
+        val m = instRegex.find(t.tx.description) ?: return@mapNotNull null
+        val cur = m.groupValues[1].toInt(); val tot = m.groupValues[2].toInt()
+        if (tot < 2 || tot > 48 || cur < 1 || cur > tot) null else Hit(t, cur, tot)
+    }
+    return hits.groupBy { ruleKeyFor(it.item.tx) + "|" + it.tot }
+        .mapNotNull { (_, l) ->
+            val parc = l.any { it.item.tx.description.contains("parc", ignoreCase = true) }
+            if (!parc && l.map { it.item.tx.date.take(7) }.distinct().size < 2) return@mapNotNull null
+            val latest = l.maxByOrNull { it.cur } ?: return@mapNotNull null
+            val inst = Installment(
+                latest.item.tx.description, latest.item.category, -latest.item.tx.amount,
+                latest.cur, latest.tot, l.maxOf { it.item.tx.date }
+            )
+            if (inst.remaining > 0 && inst.lastDate >= minDate) inst else null
+        }
+        .sortedByDescending { it.remainingAmount }
+}
+
+// ---------------- Vencimentos ----------------
+data class Upcoming(val name: String, val date: LocalDate, val amount: Double, val kind: String, val overdue: Boolean)
+
+fun billDueDate(b: Bill, ym: YearMonth = YearMonth.now()): LocalDate =
+    ym.atDay(minOf(b.dueDay, ym.lengthOfMonth()))
+
+fun isPaid(b: Bill) = b.lastPaidMonth == monthKey()
+
+/** Próximos vencimentos (contas a pagar não pagas + faturas de cartão) nos próximos [days] dias. */
+fun upcoming(bills: List<Bill>, accounts: List<Account>, days: Long = 15): List<Upcoming> {
+    val today = LocalDate.now()
+    val out = mutableListOf<Upcoming>()
+    bills.filter { !isPaid(it) }.forEach {
+        val d = billDueDate(it)
+        if (!d.isAfter(today.plusDays(days))) out += Upcoming(it.name, d, it.amount, "Conta", d.isBefore(today))
+    }
+    accounts.filter { it.type == "CREDIT" && it.dueDate != null && it.balance > 0 }.forEach {
+        val d = runCatching { LocalDate.parse(it.dueDate) }.getOrNull() ?: return@forEach
+        if (!d.isBefore(today) && !d.isAfter(today.plusDays(days))) {
+            out += Upcoming("Fatura ${it.institution}", d, it.balance, "Cartão", false)
+        }
+    }
+    return out.sortedBy { it.date }
+}
+
+fun monthSummaryText(real: List<TxItem>, month: String): String {
+    val cur = real.inMonth(month)
+    val inc = cur.incomeSum(); val exp = cur.expenseSum()
+    val sb = StringBuilder("Resumo de ${monthLabel(month)}\n")
+    sb.append("Receitas: ${moneyPlain(inc)}\nDespesas: ${moneyPlain(exp)}\nResultado: ${moneyPlain(inc - exp)}\n")
+    val top = spendByCategory(cur).take(5)
+    if (top.isNotEmpty()) {
+        sb.append("\nMaiores categorias:\n")
+        top.forEach { (c, v) -> sb.append("• $c: ${moneyPlain(v)}\n") }
+    }
+    return sb.toString()
+}

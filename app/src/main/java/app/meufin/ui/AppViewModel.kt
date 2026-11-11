@@ -186,4 +186,54 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
 
     // ----- contas a pagar -----
     fun saveBill(bill: Bill) {
-        viewModel
+        viewModelScope.launch { dao.putBill(bill) }
+    }
+
+    fun deleteBill(bill: Bill) {
+        viewModelScope.launch { dao.deleteBill(bill.id) }
+    }
+
+    fun setBillPaid(bill: Bill, paid: Boolean) {
+        viewModelScope.launch { dao.putBill(bill.copy(lastPaidMonth = if (paid) monthKey() else "")) }
+    }
+
+    // ----- exportação / backup / limpeza -----
+    fun buildCsv(): String {
+        val sb = StringBuilder("data;descricao;categoria;valor;conta;observacao\n")
+        val acc = accounts.value.associateBy { it.id }
+        fun clean(s: String) = s.replace(";", ",").replace("\n", " ")
+        txs.value.forEach {
+            val a = acc[it.tx.accountId]?.let { x -> "${x.institution} ${x.name}" } ?: "Manual"
+            sb.append(it.tx.date).append(';').append(clean(it.tx.description)).append(';')
+                .append(clean(it.category)).append(';')
+                .append(String.format(Locale.US, "%.2f", it.tx.amount)).append(';')
+                .append(clean(a)).append(';').append(clean(it.note)).append('\n')
+        }
+        return sb.toString()
+    }
+
+    suspend fun backupJson(): String = withContext(Dispatchers.IO) { Backup.export(dao) }
+
+    fun restoreBackup(json: String) {
+        viewModelScope.launch {
+            message = try {
+                val n = withContext(Dispatchers.IO) { Backup.import(dao, json) }
+                "Backup restaurado ($n itens)"
+            } catch (e: Exception) {
+                "Arquivo de backup inválido"
+            }
+        }
+    }
+
+    fun monthSummary(): String = monthSummaryText(txs.value.filter { !it.ignored }, monthKey())
+
+    fun wipeLocalData() {
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.clearTx(); dao.clearAccounts(); dao.clearRules()
+            dao.clearBudgets(); dao.clearGoals(); dao.clearMetas()
+            dao.clearBills(); dao.clearSnapshots()
+            settings.lastSync = 0L
+            lastSync = 0L
+        }
+    }
+}

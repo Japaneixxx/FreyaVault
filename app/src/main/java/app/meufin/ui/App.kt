@@ -44,4 +44,30 @@ fun App(vm: AppViewModel, onUnlock: () -> Unit) {
         Column(Modifier.padding(pad).fillMaxSize()) {
             if (vm.syncing) LinearProgressIndicator(Modifier.fillMaxWidth())
             when (tab) {
-                0 -> HomeScreen(vm, goP
+                0 -> HomeScreen(vm, goPlan = { tab = 2 })
+                1 -> ExtratoScreen(vm)
+                2 -> PlanScreen(vm)
+                else -> MoreScreen(vm)
+            }
+        }
+    }
+}
+
+@Composable
+private fun LockScreen(onUnlock: () -> Unit) {
+    LaunchedEffect(Unit) { onUnlock() }
+    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Column(
+            Modifier.fillMaxSize().padding(32.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(Icons.Default.Lock, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(48.dp))
+            Spacer(Modifier.height(16.dp))
+            Text("Meu Financeiro", style = MaterialTheme.typography.headlineMedium)
+            Text("Bloqueado", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(24.dp))
+            Button(onClick = onUnlock) { Text("Desbloquear") }
+        }
+    }
+}
