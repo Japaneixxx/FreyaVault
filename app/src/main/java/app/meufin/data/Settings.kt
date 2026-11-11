@@ -36,6 +36,9 @@ class Settings(ctx: Context) {
         get() = prefs.getInt("theme", 0)
         set(v) { prefs.edit().putInt("theme", v).apply() }
 
+    /** Categorias criadas pelo usuário, separadas por "|". */
+    var customCategories: String get() = str("custom_cats"); set(v) = put("custom_cats", v)
+
     // usados pelo widget
     var widgetBank: Double
         get() = str("w_bank").toDoubleOrNull() ?: 0.0

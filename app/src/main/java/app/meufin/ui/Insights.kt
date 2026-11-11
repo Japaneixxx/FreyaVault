@@ -55,6 +55,13 @@ fun buildInsights(real: List<TxItem>, month: String): List<String> {
     spendByCategory(cur).firstOrNull()?.let { (cat, v) ->
         out += "Maior categoria: $cat, com ${money(v)} (${(v / e * 100).roundToInt()}% das despesas)."
     }
+    cur.filter { it.tx.amount < 0 }
+        .groupBy { runCatching { LocalDate.parse(it.tx.date).dayOfWeek }.getOrNull() }
+        .filterKeys { it != null }
+        .mapValues { (_, l) -> -l.sumOf { it.tx.amount } }
+        .maxByOrNull { it.value }?.let { (dow, _) ->
+            if (e > 0 && cur.size >= 8) out += "Seu dia de maior gasto costuma ser ${weekdayName(dow!!)}."
+        }
     if (month == monthKey()) {
         val passed = LocalDate.now().dayOfMonth
         if (passed >= 5 && e > 0) {

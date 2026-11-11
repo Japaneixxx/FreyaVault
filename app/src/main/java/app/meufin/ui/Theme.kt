@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowInsetsControllerCompat
@@ -58,6 +59,7 @@ private val DarkScheme = darkColorScheme(
 
 private val NordicTypography = Typography().let { t ->
     t.copy(
+        displaySmall = t.displaySmall.copy(fontWeight = FontWeight.Light, fontSize = 40.sp, letterSpacing = (-1).sp),
         headlineLarge = t.headlineLarge.copy(fontWeight = FontWeight.Light, letterSpacing = (-0.5).sp),
         headlineMedium = t.headlineMedium.copy(fontWeight = FontWeight.Light),
         headlineSmall = t.headlineSmall.copy(fontWeight = FontWeight.Light),
@@ -103,6 +105,7 @@ fun AppTheme(mode: Int = 0, content: @Composable () -> Unit) {
 fun NCard(
     modifier: Modifier = Modifier,
     container: Color = MaterialTheme.colorScheme.surface,
+    padding: Dp = 18.dp,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Card(
@@ -111,7 +114,7 @@ fun NCard(
         colors = CardDefaults.cardColors(containerColor = container),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
-        Column(Modifier.padding(18.dp)) { content() }
+        Column(Modifier.padding(padding)) { content() }
     }
 }
 

@@ -4,16 +4,20 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -32,6 +36,7 @@ fun HomeScreen(vm: AppViewModel, goPlan: () -> Unit) {
     val bills by vm.bills.collectAsState()
     val snaps by vm.snapshots.collectAsState()
     var month by rememberSaveable { mutableStateOf(monthKey()) }
+    var adding by remember { mutableStateOf(false) }
     val ym = YearMonth.parse(month)
 
     val bank = accounts.filter { it.type == "BANK" }.sumOf { it.balance }
@@ -50,6 +55,11 @@ fun HomeScreen(vm: AppViewModel, goPlan: () -> Unit) {
         cumulative(cur, ym.lengthOfMonth()).take(upTo)
     }
     val prevCum = remember(prev, month) { cumulative(prev, ym.minusMonths(1).lengthOfMonth()) }
+    val perDay = remember(cur) {
+        cur.filter { it.tx.amount < 0 }
+            .groupBy { it.tx.date.takeLast(2).toIntOrNull() ?: 0 }
+            .mapValues { (_, l) -> -l.sumOf { it.tx.amount } }
+    }
     val insights = remember(real, month, Privacy.hidden) { buildInsights(real, month) }
     val last6 = remember(real) {
         (5 downTo 0).map { i ->
@@ -71,44 +81,50 @@ fun HomeScreen(vm: AppViewModel, goPlan: () -> Unit) {
 
     LazyColumn(
         Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        // ---------- hero ----------
         item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("Visão geral", style = MaterialTheme.typography.headlineMedium)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = { vm.toggleHide() }) { Text(if (Privacy.hidden) "Mostrar" else "Ocultar") }
-                    IconButton(onClick = { vm.sync() }, enabled = !vm.syncing) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Sincronizar")
-                    }
-                }
-            }
-        }
-        item {
-            NCard(Modifier.fillMaxWidth(), container = MaterialTheme.colorScheme.primaryContainer) {
-                val c = MaterialTheme.colorScheme.onPrimaryContainer
-                Text("Saldo em contas", style = MaterialTheme.typography.labelLarge, color = c)
-                Spacer(Modifier.height(4.dp))
-                Text(money(bank), style = MaterialTheme.typography.headlineLarge, color = c)
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "Cartões (fatura) ${money(cards)}  ·  atualizado ${ago(vm.lastSync)}",
-                    style = MaterialTheme.typography.bodySmall, color = c
+            Box(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(30.dp)).background(
+                    Brush.verticalGradient(listOf(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.surface))
                 )
-                if (up.isNotEmpty() && dueUntilEnd > 0) {
+            ) {
+                Mountains(Modifier.align(Alignment.BottomCenter))
+                Column(Modifier.padding(22.dp)) {
+                    Text("Saldo em contas", style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f))
+                    Spacer(Modifier.height(2.dp))
+                    Text(money(bank), style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        "Previsto no fim do mês: ${money(bank - dueUntilEnd)} (após ${money(dueUntilEnd)} em vencimentos)",
-                        style = MaterialTheme.typography.bodySmall, color = c
+                        "Cartões (fatura) ${money(cards)}  ·  atualizado ${ago(vm.lastSync)}",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                     )
+                    if (up.isNotEmpty() && dueUntilEnd > 0) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Previsto no fim do mês: ${money(bank - dueUntilEnd)}",
+                            style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                    Spacer(Modifier.height(14.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        AssistChip(onClick = { vm.sync() }, enabled = !vm.syncing,
+                            label = { Text(if (vm.syncing) "Sincronizando…" else "Sincronizar") })
+                        AssistChip(onClick = { vm.toggleHide() }, label = { Text(if (Privacy.hidden) "Mostrar" else "Ocultar") })
+                        AssistChip(onClick = { adding = true }, label = { Text("+ Lançamento") })
+                    }
+                    Spacer(Modifier.height(36.dp))
                 }
             }
         }
         if (up.isNotEmpty()) item {
             NCard(Modifier.fillMaxWidth()) {
                 SectionTitle("Próximos vencimentos")
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(6.dp))
                 up.take(4).forEach { u ->
                     val days = ChronoUnit.DAYS.between(LocalDate.now(), u.date).toInt()
                     val whenTxt = when {
@@ -118,6 +134,8 @@ fun HomeScreen(vm: AppViewModel, goPlan: () -> Unit) {
                         else -> "vence em $days dias"
                     }
                     Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        CategoryAvatar(if (u.kind == "Cartão") "Pagamento de fatura" else "Moradia", 38.dp)
+                        Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
                             Text(u.name, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(whenTxt, style = MaterialTheme.typography.bodySmall,
@@ -129,6 +147,8 @@ fun HomeScreen(vm: AppViewModel, goPlan: () -> Unit) {
                 TextButton(onClick = goPlan) { Text("Ver contas e cartões") }
             }
         }
+
+        // ---------- mês ----------
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { month = ym.minusMonths(1).toString() }) { Icon(Icons.Default.KeyboardArrowLeft, "Mês anterior") }
@@ -140,24 +160,43 @@ fun HomeScreen(vm: AppViewModel, goPlan: () -> Unit) {
         }
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                StatCard("Receitas", money(income), IncomeColor, Modifier.weight(1f))
-                StatCard("Despesas", money(expense), ExpenseColor, Modifier.weight(1f))
+                StatCard("Receitas", "▲", money(income), IncomeColor, Modifier.weight(1f))
+                StatCard("Despesas", "▼", money(expense), ExpenseColor, Modifier.weight(1f))
             }
         }
         item {
             val res = income - expense
-            StatCard("Resultado do mês", money(res), if (res >= 0) IncomeColor else ExpenseColor, Modifier.fillMaxWidth())
-        }
-        if (insights.isNotEmpty()) item {
-            NCard(Modifier.fillMaxWidth(), container = MaterialTheme.colorScheme.secondaryContainer) {
-                SectionTitle("Insights")
-                Spacer(Modifier.height(8.dp))
-                insights.forEach {
-                    Text("•  $it", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier.padding(vertical = 3.dp))
+            NCard(Modifier.fillMaxWidth(), container = if (res >= 0) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Column {
+                        Text("Resultado do mês", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(money(res), style = MaterialTheme.typography.headlineSmall, color = if (res >= 0) IncomeColor else ExpenseColor)
+                    }
+                    if (income > 0) Pill("${((res / income) * 100).roundToInt()}% da receita")
                 }
             }
         }
+
+        // ---------- insights (carrossel) ----------
+        if (insights.isNotEmpty()) item {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                items(insights) { text ->
+                    Card(
+                        Modifier.width(250.dp),
+                        shape = MaterialTheme.shapes.large,
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                    ) {
+                        Column(Modifier.padding(16.dp)) {
+                            Text("💡", style = MaterialTheme.typography.titleMedium)
+                            Spacer(Modifier.height(4.dp))
+                            Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                        }
+                    }
+                }
+            }
+        }
+
+        // ---------- categorias ----------
         item {
             NCard(Modifier.fillMaxWidth()) {
                 SectionTitle("Para onde foi o dinheiro")
@@ -170,9 +209,9 @@ fun HomeScreen(vm: AppViewModel, goPlan: () -> Unit) {
                     val total = byCat.sumOf { it.second }.coerceAtLeast(1.0)
                     byCat.take(6).forEach { (cat, v) ->
                         val before = prevByCat[cat]
-                        Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.size(10.dp).background(categoryColor(cat), CircleShape))
-                            Spacer(Modifier.width(10.dp))
+                        Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            CategoryAvatar(cat, 36.dp)
+                            Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(cat, style = MaterialTheme.typography.bodyMedium)
                                 if (before != null && before > 0) {
@@ -184,13 +223,24 @@ fun HomeScreen(vm: AppViewModel, goPlan: () -> Unit) {
                                     )
                                 }
                             }
-                            Text("${(v / total * 100).roundToInt()}%", style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Spacer(Modifier.width(12.dp))
-                            Text(money(v), style = MaterialTheme.typography.bodyMedium)
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(money(v), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                                Text("${(v / total * 100).roundToInt()}%", style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
                     }
                 }
+            }
+        }
+        item {
+            NCard(Modifier.fillMaxWidth()) {
+                SectionTitle("Calendário de gastos")
+                Spacer(Modifier.height(4.dp))
+                Text("Quanto mais escuro o dia, maior o gasto.", style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(12.dp))
+                SpendHeatmap(ym, perDay)
             }
         }
         item {
@@ -236,20 +286,24 @@ fun HomeScreen(vm: AppViewModel, goPlan: () -> Unit) {
         if (topTx.isNotEmpty()) item {
             NCard(Modifier.fillMaxWidth()) {
                 SectionTitle("Maiores gastos do mês")
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(6.dp))
                 topTx.forEach {
                     Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        CategoryAvatar(it.category, 38.dp)
+                        Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
                             Text(it.tx.description, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
                             Text(it.category, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Spacer(Modifier.width(12.dp))
-                        Text(money(it.tx.amount), color = ExpenseColor, fontWeight = FontWeight.Medium)
+                        Text(money(it.tx.amount), fontWeight = FontWeight.Medium)
                     }
                 }
             }
         }
     }
+
+    if (adding) AddSheet(vm) { adding = false }
 }
 
 @Composable
@@ -262,18 +316,18 @@ fun BudgetBar(category: String, spent: Double, limit: Double, onClick: (() -> Un
     }
     val mod = if (onClick != null) Modifier.fillMaxWidth().clickable(onClick = onClick) else Modifier.fillMaxWidth()
     Column(mod.padding(vertical = 8.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(category, style = MaterialTheme.typography.bodyMedium)
-            Text("${money(spent)} / ${money(limit)}", style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            CategoryAvatar(category, 34.dp)
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(category, style = MaterialTheme.typography.bodyMedium)
+                Text("${money(spent)} de ${money(limit)}", style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Text("${(frac * 100).roundToInt()}%", style = MaterialTheme.typography.labelLarge, color = color)
         }
-        Spacer(Modifier.height(6.dp))
-        LinearProgressIndicator(
-            progress = { frac.coerceIn(0f, 1f) },
-            color = color,
-            trackColor = MaterialTheme.colorScheme.surfaceVariant,
-            modifier = Modifier.fillMaxWidth().height(8.dp)
-        )
+        Spacer(Modifier.height(8.dp))
+        NProgress(frac, color)
         if (frac >= 1f) {
             Text("Estourou em ${money(spent - limit)}", style = MaterialTheme.typography.labelSmall, color = ExpenseColor,
                 modifier = Modifier.padding(top = 4.dp))
@@ -282,10 +336,13 @@ fun BudgetBar(category: String, spent: Double, limit: Double, onClick: (() -> Un
 }
 
 @Composable
-private fun StatCard(title: String, value: String, color: Color, modifier: Modifier) {
+private fun StatCard(title: String, glyph: String, value: String, color: Color, modifier: Modifier) {
     NCard(modifier) {
+        Box(Modifier.size(30.dp).background(color.copy(alpha = 0.15f), CircleShape), contentAlignment = Alignment.Center) {
+            Text(glyph, color = color, style = MaterialTheme.typography.labelSmall)
+        }
+        Spacer(Modifier.height(10.dp))
         Text(title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(4.dp))
-        Text(value, style = MaterialTheme.typography.titleLarge, color = color)
+        Text(value, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
     }
 }

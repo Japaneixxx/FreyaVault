@@ -34,6 +34,7 @@ fun MoreScreen(vm: AppViewModel) {
     val groups = remember(accounts) { accounts.groupBy { it.institution } }
     var confirmWipe by remember { mutableStateOf(false) }
     var showRules by remember { mutableStateOf(false) }
+    var showCats by remember { mutableStateOf(false) }
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -154,6 +155,9 @@ fun MoreScreen(vm: AppViewModel) {
                 OutlinedButton(onClick = { csvExporter.launch("meu-financeiro.csv") }, modifier = Modifier.fillMaxWidth()) {
                     Text("Exportar transações (CSV)")
                 }
+                OutlinedButton(onClick = { showCats = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Categorias personalizadas (${Cats.custom.size})")
+                }
                 OutlinedButton(onClick = { showRules = true }, modifier = Modifier.fillMaxWidth()) {
                     Text("Minhas regras de categoria (${rules.size})")
                 }
@@ -188,6 +192,40 @@ fun MoreScreen(vm: AppViewModel) {
             text = { Text("Remove contas, transações, categorias, orçamentos, metas e contas a pagar do aparelho. Faça um backup antes. Suas credenciais continuam salvas.") },
             confirmButton = { TextButton(onClick = { vm.wipeLocalData(); confirmWipe = false }) { Text("Apagar") } },
             dismissButton = { TextButton(onClick = { confirmWipe = false }) { Text("Cancelar") } }
+        )
+    }
+    if (showCats) {
+        var newCat by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showCats = false },
+            title = { Text("Categorias personalizadas") },
+            confirmButton = { TextButton(onClick = { showCats = false }) { Text("Fechar") } },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(
+                            newCat, { newCat = it }, label = { Text("Nova categoria") }, singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(
+                            enabled = newCat.isNotBlank(),
+                            onClick = { vm.addCategory(newCat); newCat = "" }
+                        ) { Text("Adicionar") }
+                    }
+                    if (Cats.custom.isEmpty()) {
+                        Text("Crie categorias como Pet, Presentes ou Academia. Elas aparecem nos filtros, orçamentos e lançamentos.",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Cats.custom.forEach { c ->
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            CategoryAvatar(c, 32.dp)
+                            Spacer(Modifier.width(10.dp))
+                            Text(c, Modifier.weight(1f))
+                            TextButton(onClick = { vm.removeCategory(c) }) { Text("Remover") }
+                        }
+                    }
+                }
+            }
         )
     }
     if (showRules) {

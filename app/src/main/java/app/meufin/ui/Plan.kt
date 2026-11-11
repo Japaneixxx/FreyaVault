@@ -11,11 +11,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import app.meufin.data.BUDGET_CATEGORIES
 import app.meufin.data.Bill
 import app.meufin.data.Budget
 import app.meufin.data.Goal
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.temporal.ChronoUnit
 import kotlin.math.roundToInt
 
@@ -73,6 +73,14 @@ private fun BudgetsSection(vm: AppViewModel) {
                     if (left >= 0) "Ainda disponível: ${money(left)}" else "Acima do orçado: ${money(-left)}",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
+                val daysLeft = YearMonth.now().lengthOfMonth() - LocalDate.now().dayOfMonth + 1
+                if (left > 0 && daysLeft > 0) {
+                    Text(
+                        "≈ ${money(left / daysLeft)} por dia até o fim do mês",
+                        style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
             }
         }
         if (budgets.isEmpty()) item {
@@ -110,7 +118,7 @@ private fun BudgetDialog(
     existing: Budget?, onDismiss: () -> Unit,
     onSave: (String, Double) -> Unit, onDelete: (() -> Unit)?
 ) {
-    var cat by remember { mutableStateOf(existing?.category ?: BUDGET_CATEGORIES.first()) }
+    var cat by remember { mutableStateOf(existing?.category ?: Cats.budget.first()) }
     var value by remember { mutableStateOf(existing?.limitAmount?.roundToInt()?.toString() ?: "") }
     val amount = parseAmount(value)
     AlertDialog(
@@ -118,7 +126,7 @@ private fun BudgetDialog(
         title = { Text(if (existing == null) "Novo orçamento" else "Editar orçamento") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (existing == null) CategoryPicker(cat, BUDGET_CATEGORIES) { cat = it }
+                if (existing == null) CategoryPicker(cat, Cats.budget) { cat = it }
                 else Text(existing.category, style = MaterialTheme.typography.titleMedium)
                 OutlinedTextField(value, { value = it }, label = { Text("Limite mensal (R$)") }, singleLine = true)
             }
@@ -263,7 +271,9 @@ private fun RecurringSection(vm: AppViewModel) {
         }
         items(list, key = { it.name + it.lastDate }) { r ->
             NCard(Modifier.fillMaxWidth()) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    CategoryAvatar(r.category, 40.dp)
+                    Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(r.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
                         Text("${r.category} · ${r.months} meses · última em ${dayLabel(r.lastDate)}",

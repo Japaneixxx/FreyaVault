@@ -34,7 +34,10 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     val settings = Settings(app)
     private val dao = Db.get(app).dao()
 
-    init { Privacy.hidden = settings.hideValues }
+    init {
+        Privacy.hidden = settings.hideValues
+        Cats.custom = settings.customCategories.split("|").map { it.trim() }.filter { it.isNotBlank() }
+    }
 
     val accounts = dao.accounts().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val budgets = dao.budgets().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
@@ -120,6 +123,28 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { dao.putRule(Rule(ruleKeyFor(item.tx), category)) }
     }
 
+    fun setCategoryBulk(items: List<TxItem>, category: String) {
+        viewModelScope.launch {
+            items.map { ruleKeyFor(it.tx) }.distinct().forEach { dao.putRule(Rule(it, category)) }
+        }
+    }
+
+    fun setIgnoredBulk(items: List<TxItem>, ignored: Boolean) {
+        viewModelScope.launch { items.forEach { dao.putMeta(TxMeta(it.tx.id, it.note, ignored)) } }
+    }
+
+    fun addCategory(name: String) {
+        val n = name.trim()
+        if (n.isBlank() || n in Cats.all) return
+        Cats.custom = Cats.custom + n
+        settings.customCategories = Cats.custom.joinToString("|")
+    }
+
+    fun removeCategory(name: String) {
+        Cats.custom = Cats.custom - name
+        settings.customCategories = Cats.custom.joinToString("|")
+    }
+
     fun deleteRule(key: String) {
         viewModelScope.launch { dao.deleteRule(key) }
     }
@@ -165,7 +190,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
             spendByCategory(real.inMonth(m)).forEach { (c, v) -> totals[c] = (totals[c] ?: 0.0) + v }
         }
         viewModelScope.launch {
-            totals.filterKeys { it in BUDGET_CATEGORIES }.entries
+            totals.filterKeys { it in Cats.budget }.entries
                 .sortedByDescending { it.value }.take(6)
                 .forEach { (c, v) -> dao.putBudget(Budget(c, Math.ceil(v / 3 / 10.0) * 10.0)) }
         }

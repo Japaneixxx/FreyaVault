@@ -67,3 +67,11 @@ Pluggy (se vier) -> palavras-chave locais (Categorizer.kt) -> regra aprendida ao
 - Filtro por conta no extrato, tema claro/escuro/sistema, regras de categoria gerenciáveis.
 - Backup/restauração em JSON, compartilhar resumo do mês, ícone do app.
 - Banco migra de v2 para v3 sem perder dados.
+
+## v1.3.0
+- Redesign nórdico completo: Início com topo em gradiente e montanhas, avatares de categoria, carrossel de insights e calendário de gastos.
+- Extrato novo: cartões por dia com total do dia, chips de mês/filtros, ordenação (recentes, maiores gastos, maiores entradas), resumo do período, seleção em lote (segure um lançamento) para recategorizar ou ignorar, e detalhe em painel inferior com estatísticas do estabelecimento.
+- Categorias personalizadas (Mais) disponíveis em filtros, orçamentos e lançamentos.
+- Planejar: "quanto posso gastar por dia" até o fim do mês e avatares nas recorrências.
+- Insight do dia da semana com maior gasto.
+
