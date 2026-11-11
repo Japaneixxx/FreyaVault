@@ -66,6 +66,9 @@ fun MoreScreen(vm: AppViewModel) {
         } else {
             vm.setAlerts(false)
             vm.message = "Permissão de notificações negada"
+            if (!Alerts.openNotificationSettings(ctx)) {
+                vm.message = "Não foi possível abrir as configurações de notificações"
+            }
         }
     }
 
@@ -120,6 +123,9 @@ fun MoreScreen(vm: AppViewModel) {
                                 throw error
                             }
                         }
+                }
+                else if (!Alerts.notificationsEnabled(ctx) && !Alerts.openNotificationSettings(ctx)) {
+                    vm.message = "Não foi possível abrir as configurações de notificações"
                 }
                 else vm.setAlerts(true)
             }
