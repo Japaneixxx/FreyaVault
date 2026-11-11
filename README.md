@@ -1,0 +1,31 @@
+# Meu Financeiro
+
+App Android (Kotlin + Jetpack Compose + Room) de finanças pessoais via Open Finance (Pluggy / Meu Pluggy).
+100% local: sem servidor próprio. O app chama api.pluggy.ai direto do aparelho.
+
+## Rodar
+1. Abra a pasta no Android Studio (Koala ou mais novo, JDK 17) e aguarde o Gradle sync.
+2. Run no aparelho/emulador (minSdk 26).
+
+## Credenciais Pluggy (plano pessoal gratuito)
+1. Conecte seus bancos em https://meu.pluggy.ai
+2. No https://dashboard.pluggy.ai crie uma Application, abra a tela Demo e conecte o conector MeuPluggy.
+3. Copie Client ID, Client Secret (mostrado uma vez) e o Item ID de cada banco (máx. 5).
+4. Cole no app. Ficam criptografadas (EncryptedSharedPreferences).
+
+## Como funciona a sincronização
+- Dispara em MainActivity.onStart (sempre que o app abre/volta), com intervalo mínimo de 15 min.
+- Sem WorkManager/serviço: nada roda em segundo plano.
+- Meu Pluggy atualiza os bancos ~1x/24h; o app só lê o que já está lá.
+
+## Categorias
+Pluggy (se vier) -> palavras-chave locais (Categorizer.kt) -> regra aprendida ao tocar numa transação.
+"Pagamento de fatura" e "Transferência própria" não entram em receitas/despesas.
+
+## Funções (v1.1)
+- Visual nórdico (claro/escuro): cartões sem sombra, paleta fiorde/sálvia/areia.
+- Início: saldo, receitas/despesas, insights, rosca por categoria, ritmo de gastos vs mês anterior, orçamentos, últimos 6 meses, maiores gastos.
+- Extrato: busca, filtros (período, tipo, categoria), detalhe com observação, "ignorar nos totais", lançamentos manuais (dinheiro).
+- Planejar: orçamentos por categoria (com sugestão automática), metas de poupança, cobranças recorrentes detectadas.
+- Mais: contas, modo privacidade (ocultar valores), exportar CSV, credenciais.
+- Atualizar da v1.0 limpa o banco local uma vez (tudo é re-sincronizado); credenciais são mantidas.
