@@ -1,6 +1,6 @@
-# Meu Financeiro
+# Freya
 
-App Android (Kotlin + Jetpack Compose + Room) de finanças pessoais via Open Finance (Pluggy / Meu Pluggy).
+App Android (Kotlin + Jetpack Compose + Room) de finanças pessoais via Open Finance (Pluggy / Meu Pluggy), desenvolvido por Japaneixxx.
 100% local: sem servidor próprio. O app chama api.pluggy.ai direto do aparelho.
 
 ## Rodar

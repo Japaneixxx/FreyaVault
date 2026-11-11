@@ -16,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -23,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import app.meufin.Alerts
 import app.meufin.Biometric
+import japaneixxx.freya.R
 import kotlinx.coroutines.launch
 
 @Composable
@@ -217,7 +219,12 @@ private fun SwitchRow(title: String, subtitle: String, checked: Boolean, onChang
 fun SetupScreen(vm: AppViewModel) {
     Scaffold { pad ->
         Column(Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp)) {
-            Text("Meu Financeiro", style = MaterialTheme.typography.headlineLarge)
+            Text("Freya", style = MaterialTheme.typography.headlineLarge)
+            Text(
+                stringResource(R.string.developer_name),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             Spacer(Modifier.height(8.dp))
             Text(
                 "Seus dados ficam só neste aparelho. As credenciais são guardadas criptografadas e o app fala direto com o Pluggy.",

@@ -9,6 +9,7 @@ import android.content.Intent
 import android.widget.RemoteViews
 import app.meufin.data.Settings
 import app.meufin.ui.moneyPlain
+import japaneixxx.freya.R
 
 /** Widget de saldo. Com bloqueio ou "ocultar valores" ativos, não mostra números na tela inicial. */
 class BalanceWidget : AppWidgetProvider() {

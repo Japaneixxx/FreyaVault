@@ -65,7 +65,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.app-version.outputs.name }}
-          name: Meu Financeiro v${{ steps.app-version.outputs.name }}
+          name: Freya v${{ steps.app-version.outputs.name }}
           target_commitish: ${{ github.sha }}
           generate_release_notes: true
           files: app/build/outputs/apk/release/app-release.apk

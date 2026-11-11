@@ -64,7 +64,7 @@ private fun LockScreen(onUnlock: () -> Unit) {
         ) {
             Icon(Icons.Default.Lock, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(48.dp))
             Spacer(Modifier.height(16.dp))
-            Text("Meu Financeiro", style = MaterialTheme.typography.headlineMedium)
+            Text("Freya", style = MaterialTheme.typography.headlineMedium)
             Text("Bloqueado", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(24.dp))
             Button(onClick = onUnlock) { Text("Desbloquear") }

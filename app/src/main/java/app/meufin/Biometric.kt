@@ -23,7 +23,7 @@ object Biometric {
         }
         val prompt = BiometricPrompt(activity, ContextCompat.getMainExecutor(activity), callback)
         val builder = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Meu Financeiro")
+            .setTitle("Freya")
             .setSubtitle("Confirme sua identidade")
             .setAllowedAuthenticators(auth)
         if (Build.VERSION.SDK_INT < 30) builder.setNegativeButtonText("Cancelar")

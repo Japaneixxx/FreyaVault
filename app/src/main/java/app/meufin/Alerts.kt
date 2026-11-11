@@ -14,6 +14,7 @@ import androidx.work.*
 import app.meufin.data.Db
 import app.meufin.data.Settings
 import app.meufin.ui.*
+import japaneixxx.freya.R
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
