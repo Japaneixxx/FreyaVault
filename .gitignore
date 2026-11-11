@@ -14,11 +14,14 @@ local.properties
 
 # Android build outputs
 app/build/
+*.apk
+*.aab
 captures/
 .externalNativeBuild/
 .cxx/
 
 # Kotlin
+.kotlin/
 *.kotlin_module
 
 # Operating system files
