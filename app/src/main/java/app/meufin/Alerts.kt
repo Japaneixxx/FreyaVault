@@ -14,7 +14,7 @@ import androidx.work.*
 import app.meufin.data.Db
 import app.meufin.data.Settings
 import app.meufin.ui.*
-import japaneixxx.freya.R
+import app.meufin.R
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -107,7 +107,10 @@ object Alerts {
     }
 
     fun schedule(ctx: Context, enabled: Boolean) {
-        val wm = WorkManager.getInstance(ctx)
+        val wm = runCatching { WorkManager.getInstance(ctx) }.getOrElse {
+            if (it is IllegalStateException) return
+            throw it
+        }
         if (!enabled) {
             wm.cancelUniqueWork("daily-alerts")
             return

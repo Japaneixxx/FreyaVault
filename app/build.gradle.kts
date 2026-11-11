@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "japaneixxx.freya"
+    namespace = "app.meufin"
     compileSdk = 34
 
     val releaseKeystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
@@ -27,11 +27,11 @@ android {
     }
 
     defaultConfig {
-        applicationId = "japaneixxx.freya"
+        applicationId = "app.meufin"
         minSdk = 26
         targetSdk = 34
-        versionCode = 6
-        versionName = "1.2.2"
+        versionCode = 8
+        versionName = "1.2.4"
     }
 
     buildTypes {

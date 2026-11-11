@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import app.meufin.Alerts
 import app.meufin.Biometric
-import japaneixxx.freya.R
+import app.meufin.R
 import kotlinx.coroutines.launch
 
 @Composable
@@ -60,8 +60,12 @@ fun MoreScreen(vm: AppViewModel) {
         }
     }
     val notifPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        vm.setAlerts(granted)
-        if (!granted) vm.message = "Permissão de notificações negada"
+        if (granted) {
+            vm.setAlerts(true)
+        } else {
+            vm.setAlerts(false)
+            vm.message = "Permissão de notificações negada"
+        }
     }
 
     Column(
@@ -106,7 +110,16 @@ fun MoreScreen(vm: AppViewModel) {
             Spacer(Modifier.height(10.dp))
             SwitchRow("Alertas", "Avisa quando um orçamento chega a 80%/100%, e antes do vencimento de contas e faturas.", vm.alertsEnabled) { on ->
                 if (!on) vm.setAlerts(false)
-                else if (Build.VERSION.SDK_INT >= 33 && !Alerts.canNotify(ctx)) notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                else if (Build.VERSION.SDK_INT >= 33 && !Alerts.canNotify(ctx)) {
+                    runCatching { notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS) }
+                        .onFailure { error ->
+                            if (error is IllegalStateException || error is SecurityException) {
+                                vm.message = "Não foi possível solicitar a permissão de notificações"
+                            } else {
+                                throw error
+                            }
+                        }
+                }
                 else vm.setAlerts(true)
             }
             Spacer(Modifier.height(10.dp))
