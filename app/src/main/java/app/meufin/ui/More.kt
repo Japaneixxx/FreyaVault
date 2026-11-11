@@ -92,7 +92,7 @@ fun MoreScreen(vm: AppViewModel) {
 
         SectionTitle("Segurança e avisos")
         NCard(Modifier.fillMaxWidth()) {
-            SwitchRow("Bloquear com biometria", "Pede digital, rosto ou PIN ao abrir. Também esconde o app nos recentes e oculta o widget.", vm.lockEnabled) { on ->
+            SwitchRow("Bloquear com biometria", "Pede digital, rosto ou PIN ao abrir.", vm.lockEnabled) { on ->
                 if (!on) vm.setLock(false)
                 else if (!Biometric.available(ctx)) vm.message = "Configure biometria ou bloqueio de tela no Android primeiro"
                 else {
