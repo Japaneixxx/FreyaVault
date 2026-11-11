@@ -32,10 +32,10 @@ public final class Db_Impl extends Db {
   @Override
   @NonNull
   protected SupportSQLiteOpenHelper createOpenHelper(@NonNull final DatabaseConfiguration config) {
-    final SupportSQLiteOpenHelper.Callback _openCallback = new RoomOpenHelper(config, new RoomOpenHelper.Delegate(2) {
+    final SupportSQLiteOpenHelper.Callback _openCallback = new RoomOpenHelper(config, new RoomOpenHelper.Delegate(3) {
       @Override
       public void createAllTables(@NonNull final SupportSQLiteDatabase db) {
-        db.execSQL("CREATE TABLE IF NOT EXISTS `accounts` (`id` TEXT NOT NULL, `itemId` TEXT NOT NULL, `institution` TEXT NOT NULL, `name` TEXT NOT NULL, `type` TEXT NOT NULL, `subtype` TEXT NOT NULL, `balance` REAL NOT NULL, `currency` TEXT NOT NULL, PRIMARY KEY(`id`))");
+        db.execSQL("CREATE TABLE IF NOT EXISTS `accounts` (`id` TEXT NOT NULL, `itemId` TEXT NOT NULL, `institution` TEXT NOT NULL, `name` TEXT NOT NULL, `type` TEXT NOT NULL, `subtype` TEXT NOT NULL, `balance` REAL NOT NULL, `currency` TEXT NOT NULL, `creditLimit` REAL, `availableLimit` REAL, `dueDate` TEXT, PRIMARY KEY(`id`))");
         db.execSQL("CREATE TABLE IF NOT EXISTS `transactions` (`id` TEXT NOT NULL, `accountId` TEXT NOT NULL, `date` TEXT NOT NULL, `description` TEXT NOT NULL, `amount` REAL NOT NULL, `pluggyCategory` TEXT NOT NULL, `pending` INTEGER NOT NULL, PRIMARY KEY(`id`))");
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_accountId` ON `transactions` (`accountId`)");
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_date` ON `transactions` (`date`)");
@@ -43,8 +43,10 @@ public final class Db_Impl extends Db {
         db.execSQL("CREATE TABLE IF NOT EXISTS `budgets` (`category` TEXT NOT NULL, `limitAmount` REAL NOT NULL, PRIMARY KEY(`category`))");
         db.execSQL("CREATE TABLE IF NOT EXISTS `goals` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `target` REAL NOT NULL, `saved` REAL NOT NULL)");
         db.execSQL("CREATE TABLE IF NOT EXISTS `tx_meta` (`txId` TEXT NOT NULL, `note` TEXT NOT NULL, `ignored` INTEGER NOT NULL, PRIMARY KEY(`txId`))");
+        db.execSQL("CREATE TABLE IF NOT EXISTS `bills` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `amount` REAL NOT NULL, `dueDay` INTEGER NOT NULL, `lastPaidMonth` TEXT NOT NULL)");
+        db.execSQL("CREATE TABLE IF NOT EXISTS `snapshots` (`date` TEXT NOT NULL, `bank` REAL NOT NULL, `cards` REAL NOT NULL, PRIMARY KEY(`date`))");
         db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)");
-        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e9bb88a418c1882ed9487ac9fa969695')");
+        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a3cb42e20cd9908f62a233dfd492bd96')");
       }
 
       @Override
@@ -55,6 +57,8 @@ public final class Db_Impl extends Db {
         db.execSQL("DROP TABLE IF EXISTS `budgets`");
         db.execSQL("DROP TABLE IF EXISTS `goals`");
         db.execSQL("DROP TABLE IF EXISTS `tx_meta`");
+        db.execSQL("DROP TABLE IF EXISTS `bills`");
+        db.execSQL("DROP TABLE IF EXISTS `snapshots`");
         final List<? extends RoomDatabase.Callback> _callbacks = mCallbacks;
         if (_callbacks != null) {
           for (RoomDatabase.Callback _callback : _callbacks) {
@@ -98,7 +102,7 @@ public final class Db_Impl extends Db {
       @NonNull
       public RoomOpenHelper.ValidationResult onValidateSchema(
           @NonNull final SupportSQLiteDatabase db) {
-        final HashMap<String, TableInfo.Column> _columnsAccounts = new HashMap<String, TableInfo.Column>(8);
+        final HashMap<String, TableInfo.Column> _columnsAccounts = new HashMap<String, TableInfo.Column>(11);
         _columnsAccounts.put("id", new TableInfo.Column("id", "TEXT", true, 1, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsAccounts.put("itemId", new TableInfo.Column("itemId", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsAccounts.put("institution", new TableInfo.Column("institution", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
@@ -107,6 +111,9 @@ public final class Db_Impl extends Db {
         _columnsAccounts.put("subtype", new TableInfo.Column("subtype", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsAccounts.put("balance", new TableInfo.Column("balance", "REAL", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsAccounts.put("currency", new TableInfo.Column("currency", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsAccounts.put("creditLimit", new TableInfo.Column("creditLimit", "REAL", false, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsAccounts.put("availableLimit", new TableInfo.Column("availableLimit", "REAL", false, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsAccounts.put("dueDate", new TableInfo.Column("dueDate", "TEXT", false, 0, null, TableInfo.CREATED_FROM_ENTITY));
         final HashSet<TableInfo.ForeignKey> _foreignKeysAccounts = new HashSet<TableInfo.ForeignKey>(0);
         final HashSet<TableInfo.Index> _indicesAccounts = new HashSet<TableInfo.Index>(0);
         final TableInfo _infoAccounts = new TableInfo("accounts", _columnsAccounts, _foreignKeysAccounts, _indicesAccounts);
@@ -186,9 +193,37 @@ public final class Db_Impl extends Db {
                   + " Expected:\n" + _infoTxMeta + "\n"
                   + " Found:\n" + _existingTxMeta);
         }
+        final HashMap<String, TableInfo.Column> _columnsBills = new HashMap<String, TableInfo.Column>(5);
+        _columnsBills.put("id", new TableInfo.Column("id", "INTEGER", true, 1, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsBills.put("name", new TableInfo.Column("name", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsBills.put("amount", new TableInfo.Column("amount", "REAL", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsBills.put("dueDay", new TableInfo.Column("dueDay", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsBills.put("lastPaidMonth", new TableInfo.Column("lastPaidMonth", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        final HashSet<TableInfo.ForeignKey> _foreignKeysBills = new HashSet<TableInfo.ForeignKey>(0);
+        final HashSet<TableInfo.Index> _indicesBills = new HashSet<TableInfo.Index>(0);
+        final TableInfo _infoBills = new TableInfo("bills", _columnsBills, _foreignKeysBills, _indicesBills);
+        final TableInfo _existingBills = TableInfo.read(db, "bills");
+        if (!_infoBills.equals(_existingBills)) {
+          return new RoomOpenHelper.ValidationResult(false, "bills(app.meufin.data.Bill).\n"
+                  + " Expected:\n" + _infoBills + "\n"
+                  + " Found:\n" + _existingBills);
+        }
+        final HashMap<String, TableInfo.Column> _columnsSnapshots = new HashMap<String, TableInfo.Column>(3);
+        _columnsSnapshots.put("date", new TableInfo.Column("date", "TEXT", true, 1, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsSnapshots.put("bank", new TableInfo.Column("bank", "REAL", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsSnapshots.put("cards", new TableInfo.Column("cards", "REAL", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        final HashSet<TableInfo.ForeignKey> _foreignKeysSnapshots = new HashSet<TableInfo.ForeignKey>(0);
+        final HashSet<TableInfo.Index> _indicesSnapshots = new HashSet<TableInfo.Index>(0);
+        final TableInfo _infoSnapshots = new TableInfo("snapshots", _columnsSnapshots, _foreignKeysSnapshots, _indicesSnapshots);
+        final TableInfo _existingSnapshots = TableInfo.read(db, "snapshots");
+        if (!_infoSnapshots.equals(_existingSnapshots)) {
+          return new RoomOpenHelper.ValidationResult(false, "snapshots(app.meufin.data.Snapshot).\n"
+                  + " Expected:\n" + _infoSnapshots + "\n"
+                  + " Found:\n" + _existingSnapshots);
+        }
         return new RoomOpenHelper.ValidationResult(true, null);
       }
-    }, "e9bb88a418c1882ed9487ac9fa969695", "8c7ffc1e8596410410f86ac713e43940");
+    }, "a3cb42e20cd9908f62a233dfd492bd96", "06ffac5f61a2cdd31eeeefd306e8d3b9");
     final SupportSQLiteOpenHelper.Configuration _sqliteConfig = SupportSQLiteOpenHelper.Configuration.builder(config.context).name(config.name).callback(_openCallback).build();
     final SupportSQLiteOpenHelper _helper = config.sqliteOpenHelperFactory.create(_sqliteConfig);
     return _helper;
@@ -199,7 +234,7 @@ public final class Db_Impl extends Db {
   protected InvalidationTracker createInvalidationTracker() {
     final HashMap<String, String> _shadowTablesMap = new HashMap<String, String>(0);
     final HashMap<String, Set<String>> _viewTables = new HashMap<String, Set<String>>(0);
-    return new InvalidationTracker(this, _shadowTablesMap, _viewTables, "accounts","transactions","rules","budgets","goals","tx_meta");
+    return new InvalidationTracker(this, _shadowTablesMap, _viewTables, "accounts","transactions","rules","budgets","goals","tx_meta","bills","snapshots");
   }
 
   @Override
@@ -214,6 +249,8 @@ public final class Db_Impl extends Db {
       _db.execSQL("DELETE FROM `budgets`");
       _db.execSQL("DELETE FROM `goals`");
       _db.execSQL("DELETE FROM `tx_meta`");
+      _db.execSQL("DELETE FROM `bills`");
+      _db.execSQL("DELETE FROM `snapshots`");
       super.setTransactionSuccessful();
     } finally {
       super.endTransaction();

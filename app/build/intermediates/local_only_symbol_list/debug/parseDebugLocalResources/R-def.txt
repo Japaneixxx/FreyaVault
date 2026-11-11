@@ -1,4 +1,15 @@
 R_DEF: Internal format may change without notice
 local
+color ic_launcher_background
+drawable ic_launcher_foreground
+drawable ic_stat
+drawable widget_bg
+id w_balance
+id w_root
+id w_sub
+layout widget_balance
+mipmap ic_launcher
+mipmap ic_launcher_round
 string app_name
 style Theme.App
+xml balance_widget_info

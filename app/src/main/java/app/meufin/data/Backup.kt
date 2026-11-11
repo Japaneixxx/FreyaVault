@@ -5,7 +5,7 @@ import org.json.JSONObject
 
 /** Backup em JSON do que NÃO vem do banco: orçamentos, metas, contas a pagar, regras, notas e lançamentos manuais. */
 object Backup {
-    private fun JSONArray?.each(f: (JSONObject) -> Unit) {
+    private suspend fun JSONArray?.each(f: suspend (JSONObject) -> Unit) {
         if (this == null) return
         for (i in 0 until length()) f(getJSONObject(i))
     }
