@@ -1,5 +1,6 @@
 package app.meufin.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -22,7 +23,21 @@ fun App(vm: AppViewModel, onUnlock: () -> Unit, onInstallUpdate: (android.net.Ur
     }
 
     var tab by rememberSaveable { mutableIntStateOf(0) }
+    var tabHistory by rememberSaveable { mutableStateOf(listOf<Int>()) }
     val snack = remember { SnackbarHostState() }
+    fun navigateTo(newTab: Int) {
+        if (newTab == tab) return
+        tabHistory = tabHistory + tab
+        tab = newTab
+    }
+    BackHandler(enabled = tabHistory.isNotEmpty() || tab != 0) {
+        if (tabHistory.isNotEmpty()) {
+            tab = tabHistory.last()
+            tabHistory = tabHistory.dropLast(1)
+        } else {
+            tab = 0
+        }
+    }
     LaunchedEffect(vm.message) {
         vm.message?.let {
             snack.showSnackbar(it)
@@ -51,10 +66,10 @@ fun App(vm: AppViewModel, onUnlock: () -> Unit, onInstallUpdate: (android.net.Ur
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
                     val colors = NavigationBarItemDefaults.colors(indicatorColor = MaterialTheme.colorScheme.primaryContainer)
-                    NavigationBarItem(tab == 0, { tab = 0 }, { Icon(Icons.Default.Home, null) }, label = { Text("Início") }, colors = colors)
-                    NavigationBarItem(tab == 1, { tab = 1 }, { Icon(Icons.Default.List, null) }, label = { Text("Extrato") }, colors = colors)
-                    NavigationBarItem(tab == 2, { tab = 2 }, { Icon(Icons.Default.CheckCircle, null) }, label = { Text("Planejar") }, colors = colors)
-                    NavigationBarItem(tab == 3, { tab = 3 }, { Icon(Icons.Default.Menu, null) }, label = { Text("Mais") }, colors = colors)
+                    NavigationBarItem(tab == 0, { navigateTo(0) }, { Icon(Icons.Default.Home, null) }, label = { Text("Início") }, colors = colors)
+                    NavigationBarItem(tab == 1, { navigateTo(1) }, { Icon(Icons.Default.List, null) }, label = { Text("Extrato") }, colors = colors)
+                    NavigationBarItem(tab == 2, { navigateTo(2) }, { Icon(Icons.Default.CheckCircle, null) }, label = { Text("Planejar") }, colors = colors)
+                    NavigationBarItem(tab == 3, { navigateTo(3) }, { Icon(Icons.Default.Menu, null) }, label = { Text("Mais") }, colors = colors)
                 }
             }
         }
@@ -62,7 +77,7 @@ fun App(vm: AppViewModel, onUnlock: () -> Unit, onInstallUpdate: (android.net.Ur
         Column(Modifier.padding(pad).fillMaxSize()) {
             if (vm.syncing) LinearProgressIndicator(Modifier.fillMaxWidth())
             when (tab) {
-                0 -> HomeScreen(vm, goPlan = { tab = 2 })
+                0 -> HomeScreen(vm, goPlan = { navigateTo(2) })
                 1 -> ExtratoScreen(vm)
                 2 -> PlanScreen(vm)
                 else -> MoreScreen(vm)
