@@ -11,25 +11,26 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import app.meufin.data.BUDGET_CATEGORIES
 import app.meufin.data.Bill
 import app.meufin.data.Budget
 import app.meufin.data.Goal
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.temporal.ChronoUnit
 import kotlin.math.roundToInt
 
 @Composable
-fun PlanScreen(vm: AppViewModel) {
-    var section by rememberSaveable { mutableIntStateOf(0) }
+fun PlanScreen(vm: AppViewModel, section: Int, onSection: (Int) -> Unit) {
+    val alerts by vm.chargeAlerts.collectAsState()
     Column(Modifier.fillMaxSize()) {
         Text("Planejar", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(start = 16.dp, top = 12.dp))
         Row(
             Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            listOf("Orçamentos", "Metas", "Contas", "Cartões", "Parcelas", "Recorrentes").forEachIndexed { i, l ->
-                FilterChip(selected = section == i, onClick = { section = i }, label = { Text(l) })
+            listOf("Orçamentos", "Metas", "Contas", "Cartões", "Parcelas", "Recorrentes", "Cobranças").forEachIndexed { i, l ->
+                val label = if (i == 6 && alerts.isNotEmpty()) "$l (${alerts.size})" else l
+                FilterChip(selected = section == i, onClick = { onSection(i) }, label = { Text(label) })
             }
         }
         when (section) {
@@ -38,7 +39,8 @@ fun PlanScreen(vm: AppViewModel) {
             2 -> BillsSection(vm)
             3 -> CardsSection(vm)
             4 -> InstallmentsSection(vm)
-            else -> RecurringSection(vm)
+            5 -> RecurringSection(vm)
+            else -> ChargesSection(vm)
         }
     }
 }
@@ -51,11 +53,12 @@ private fun BudgetsSection(vm: AppViewModel) {
     var editing by remember { mutableStateOf<Budget?>(null) }
     var creating by remember { mutableStateOf(false) }
 
-    val spent = remember(txs) {
-        spendByCategory(txs.filter { !it.ignored }.inMonth(monthKey())).toMap()
-    }
-    val totalLimit = budgets.sumOf { it.limitAmount }
-    val totalSpent = budgets.sumOf { spent[it.category] ?: 0.0 }
+    val envelopes by vm.envelopes.collectAsState()
+    val real = remember(txs) { txs.filter { !it.ignored } }
+    val spent = remember(real) { spendByCategory(real.inMonth(monthKey())).toMap() }
+    val eff = remember(budgets, envelopes, real) { effectiveBudgets(budgets, envelopes, real) }
+    val totalLimit = eff.sumOf { it.available }
+    val totalSpent = eff.sumOf { spent[it.category] ?: 0.0 }
 
     LazyColumn(
         Modifier.fillMaxSize(),
@@ -73,6 +76,14 @@ private fun BudgetsSection(vm: AppViewModel) {
                     if (left >= 0) "Ainda disponível: ${money(left)}" else "Acima do orçado: ${money(-left)}",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
+                val daysLeft = YearMonth.now().lengthOfMonth() - LocalDate.now().dayOfMonth + 1
+                if (left > 0 && daysLeft > 0) {
+                    Text(
+                        "≈ ${money(left / daysLeft)} por dia até o fim do mês",
+                        style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
             }
         }
         if (budgets.isEmpty()) item {
@@ -91,26 +102,35 @@ private fun BudgetsSection(vm: AppViewModel) {
                 OutlinedButton(onClick = { vm.suggestBudgets() }) { Text("Sugerir") }
             }
         }
-        items(budgets.sortedBy { it.category }, key = { it.category }) { b ->
+        items(eff.sortedBy { it.category }, key = { it.category }) { b ->
             NCard(Modifier.fillMaxWidth()) {
-                BudgetBar(b.category, spent[b.category] ?: 0.0, b.limitAmount) { editing = b }
+                BudgetBar(b.category, spent[b.category] ?: 0.0, b.available) {
+                    editing = budgets.firstOrNull { it.category == b.category }
+                }
+                if (b.envelope) {
+                    Text(
+                        "✉️ Envelope: ${money(b.limit)} do mês + ${money(b.carry)} acumulados",
+                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }
 
-    if (creating) BudgetDialog(null, onDismiss = { creating = false }, onSave = { c, v -> vm.saveBudget(c, v) }, onDelete = null)
+    if (creating) BudgetDialog(null, false, onDismiss = { creating = false }, onSave = { c, v, e -> vm.saveBudget(c, v, e) }, onDelete = null)
     editing?.let { b ->
-        BudgetDialog(b, onDismiss = { editing = null }, onSave = { c, v -> vm.saveBudget(c, v) },
-            onDelete = { vm.deleteBudget(b.category) })
+        BudgetDialog(b, envelopes.any { it.category == b.category }, onDismiss = { editing = null },
+            onSave = { c, v, e -> vm.saveBudget(c, v, e) }, onDelete = { vm.deleteBudget(b.category) })
     }
 }
 
 @Composable
 private fun BudgetDialog(
-    existing: Budget?, onDismiss: () -> Unit,
-    onSave: (String, Double) -> Unit, onDelete: (() -> Unit)?
+    existing: Budget?, isEnvelope: Boolean, onDismiss: () -> Unit,
+    onSave: (String, Double, Boolean) -> Unit, onDelete: (() -> Unit)?
 ) {
-    var cat by remember { mutableStateOf(existing?.category ?: BUDGET_CATEGORIES.first()) }
+    var envelope by remember { mutableStateOf(isEnvelope) }
+    var cat by remember { mutableStateOf(existing?.category ?: Cats.budget.first()) }
     var value by remember { mutableStateOf(existing?.limitAmount?.roundToInt()?.toString() ?: "") }
     val amount = parseAmount(value)
     AlertDialog(
@@ -118,15 +138,25 @@ private fun BudgetDialog(
         title = { Text(if (existing == null) "Novo orçamento" else "Editar orçamento") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (existing == null) CategoryPicker(cat, BUDGET_CATEGORIES) { cat = it }
+                if (existing == null) CategoryPicker(cat, Cats.budget) { cat = it }
                 else Text(existing.category, style = MaterialTheme.typography.titleMedium)
                 OutlinedTextField(value, { value = it }, label = { Text("Limite mensal (R$)") }, singleLine = true)
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f).padding(end = 8.dp)) {
+                        Text("Modo envelope")
+                        Text(
+                            "A sobra de cada mês passa para o seguinte. Estouros não acumulam.",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(checked = envelope, onCheckedChange = { envelope = it })
+                }
             }
         },
         confirmButton = {
             TextButton(
                 enabled = amount != null && amount > 0,
-                onClick = { onSave(cat, amount ?: return@TextButton); onDismiss() }
+                onClick = { onSave(cat, amount ?: return@TextButton, envelope); onDismiss() }
             ) { Text("Salvar") }
         },
         dismissButton = {
@@ -263,7 +293,9 @@ private fun RecurringSection(vm: AppViewModel) {
         }
         items(list, key = { it.name + it.lastDate }) { r ->
             NCard(Modifier.fillMaxWidth()) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    CategoryAvatar(r.category, 40.dp)
+                    Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(r.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
                         Text("${r.category} · ${r.months} meses · última em ${dayLabel(r.lastDate)}",
@@ -470,6 +502,58 @@ private fun InstallmentsSection(vm: AppViewModel) {
                 Spacer(Modifier.height(4.dp))
                 Text("Restam ${r.remaining} parcela(s): ${money(r.remainingAmount)}", style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+// ---------------- Cobranças: duplicadas e aumentos ----------------
+@Composable
+private fun ChargesSection(vm: AppViewModel) {
+    val alerts by vm.chargeAlerts.collectAsState()
+
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            NCard(Modifier.fillMaxWidth(), container = MaterialTheme.colorScheme.secondaryContainer) {
+                Text("Cobranças para revisar", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                Text(
+                    "O app compara seus lançamentos e avisa quando algo foi cobrado duas vezes em poucos dias ou quando uma assinatura/conta fixa ficou mais cara.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+        }
+        if (alerts.isEmpty()) item {
+            Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
+                Text("✅", style = MaterialTheme.typography.headlineLarge)
+                Text("Tudo certo por aqui", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Nenhuma cobrança duplicada ou reajuste encontrado nos últimos meses.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        items(alerts, key = { it.key }) { a ->
+            NCard(Modifier.fillMaxWidth()) {
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Text(if (a.isDuplicate) "⚠️" else "📈", style = MaterialTheme.typography.titleLarge)
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(a.title, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                        Text(
+                            if (a.isDuplicate) "Possível cobrança duplicada" else "Cobrança mais cara que o normal",
+                            style = MaterialTheme.typography.labelSmall, color = ExpenseColor
+                        )
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(a.describe { money(it) }, style = MaterialTheme.typography.bodyMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = { vm.dismissChargeAlert(a.key) }) { Text("Está tudo bem") }
+                }
             }
         }
     }

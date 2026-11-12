@@ -65,6 +65,39 @@ data class Bill(
 @Entity(tableName = "snapshots")
 data class Snapshot(@PrimaryKey val date: String, val bank: Double, val cards: Double)
 
+/** Investimento trazido pelo Pluggy (renda fixa, fundos, ações...). */
+@Entity(tableName = "investments")
+data class Investment(
+    @PrimaryKey val id: String,
+    val itemId: String,
+    val institution: String,
+    val name: String,
+    val type: String,
+    val balance: Double,
+    val amountOriginal: Double? = null,   // quanto foi aplicado
+    val amountProfit: Double? = null,     // lucro acumulado
+    val annualRate: Double? = null,       // % ao ano
+    val lastTwelveMonthsRate: Double? = null,
+    val currency: String = "BRL"
+)
+
+/** Bem (ASSET) ou dívida (DEBT) cadastrado à mão: carro, imóvel, financiamento... */
+@Entity(tableName = "net_items")
+data class NetItem(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val kind: String,        // ASSET | DEBT
+    val amount: Double
+)
+
+/** Categoria com orçamento em modo envelope: a sobra de cada mês acumula para o seguinte. */
+@Entity(tableName = "envelopes")
+data class Envelope(@PrimaryKey val category: String, val startMonth: String)
+
+/** Foto diária do patrimônio líquido, para o gráfico de evolução. */
+@Entity(tableName = "net_snapshots")
+data class NetSnapshot(@PrimaryKey val date: String, val total: Double)
+
 @Dao
 interface FinDao {
     @Query("SELECT * FROM accounts ORDER BY institution, name") fun accounts(): Flow<List<Account>>
@@ -75,6 +108,10 @@ interface FinDao {
     @Query("SELECT * FROM tx_meta") fun metas(): Flow<List<TxMeta>>
     @Query("SELECT * FROM bills ORDER BY dueDay, name") fun bills(): Flow<List<Bill>>
     @Query("SELECT * FROM snapshots ORDER BY date") fun snapshots(): Flow<List<Snapshot>>
+    @Query("SELECT * FROM investments ORDER BY balance DESC") fun investments(): Flow<List<Investment>>
+    @Query("SELECT * FROM net_items ORDER BY kind, name") fun netItems(): Flow<List<NetItem>>
+    @Query("SELECT * FROM envelopes") fun envelopes(): Flow<List<Envelope>>
+    @Query("SELECT * FROM net_snapshots ORDER BY date") fun netSnapshots(): Flow<List<NetSnapshot>>
 
     // leituras pontuais (alertas em segundo plano e backup)
     @Query("SELECT * FROM accounts") suspend fun accountsNow(): List<Account>
@@ -85,6 +122,9 @@ interface FinDao {
     @Query("SELECT * FROM goals") suspend fun goalsNow(): List<Goal>
     @Query("SELECT * FROM tx_meta") suspend fun metasNow(): List<TxMeta>
     @Query("SELECT * FROM bills") suspend fun billsNow(): List<Bill>
+    @Query("SELECT * FROM investments") suspend fun investmentsNow(): List<Investment>
+    @Query("SELECT * FROM net_items") suspend fun netItemsNow(): List<NetItem>
+    @Query("SELECT * FROM envelopes") suspend fun envelopesNow(): List<Envelope>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertAccounts(list: List<Account>)
     @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insertTx(list: List<Tx>): List<Long>
@@ -96,6 +136,17 @@ interface FinDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putMeta(m: TxMeta)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putBill(b: Bill)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putSnapshot(s: Snapshot)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertInvestments(list: List<Investment>)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putNetItem(i: NetItem)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putEnvelope(e: Envelope)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putNetSnapshot(s: NetSnapshot)
+    @Query("DELETE FROM investments WHERE itemId = :itemId") suspend fun deleteInvestmentsOf(itemId: String)
+    @Query("DELETE FROM net_items WHERE id = :id") suspend fun deleteNetItem(id: Long)
+    @Query("DELETE FROM envelopes WHERE category = :c") suspend fun deleteEnvelope(c: String)
+    @Query("DELETE FROM investments") suspend fun clearInvestments()
+    @Query("DELETE FROM net_items") suspend fun clearNetItems()
+    @Query("DELETE FROM envelopes") suspend fun clearEnvelopes()
+    @Query("DELETE FROM net_snapshots") suspend fun clearNetSnapshots()
 
     @Query("SELECT MAX(date) FROM transactions WHERE accountId = :accountId")
     suspend fun lastDate(accountId: String): String?
@@ -136,10 +187,34 @@ private val MIGRATION_2_3 = object : Migration(2, 3) {
     }
 }
 
+private val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `investments` (`id` TEXT NOT NULL, `itemId` TEXT NOT NULL, " +
+                "`institution` TEXT NOT NULL, `name` TEXT NOT NULL, `type` TEXT NOT NULL, `balance` REAL NOT NULL, " +
+                "`amountOriginal` REAL, `amountProfit` REAL, `annualRate` REAL, `lastTwelveMonthsRate` REAL, " +
+                "`currency` TEXT NOT NULL, PRIMARY KEY(`id`))"
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `net_items` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "`name` TEXT NOT NULL, `kind` TEXT NOT NULL, `amount` REAL NOT NULL)"
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `envelopes` (`category` TEXT NOT NULL, `startMonth` TEXT NOT NULL, " +
+                "PRIMARY KEY(`category`))"
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `net_snapshots` (`date` TEXT NOT NULL, `total` REAL NOT NULL, " +
+                "PRIMARY KEY(`date`))"
+        )
+    }
+}
+
 @Database(
     entities = [Account::class, Tx::class, Rule::class, Budget::class, Goal::class,
-        TxMeta::class, Bill::class, Snapshot::class],
-    version = 3, exportSchema = false
+        TxMeta::class, Bill::class, Snapshot::class, Investment::class, NetItem::class,
+        Envelope::class, NetSnapshot::class],
+    version = 4, exportSchema = false
 )
 abstract class Db : RoomDatabase() {
     abstract fun dao(): FinDao
@@ -148,7 +223,7 @@ abstract class Db : RoomDatabase() {
         @Volatile private var inst: Db? = null
         fun get(ctx: Context): Db = inst ?: synchronized(this) {
             inst ?: Room.databaseBuilder(ctx.applicationContext, Db::class.java, "fin.db")
-                .addMigrations(MIGRATION_2_3)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
                 .fallbackToDestructiveMigrationFrom(1) // v1 só tinha dados re-sincronizáveis
                 .build().also { inst = it }
         }

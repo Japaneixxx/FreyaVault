@@ -10,6 +10,9 @@ import java.util.concurrent.TimeUnit
 
 fun JSONObject.str(key: String): String = if (isNull(key)) "" else optString(key, "")
 
+fun JSONObject.dbl(key: String): Double? =
+    if (!has(key) || isNull(key)) null else optDouble(key).takeUnless { it.isNaN() }
+
 private fun JSONArray?.objs(): List<JSONObject> =
     if (this == null) emptyList() else List(length()) { getJSONObject(it) }
 
@@ -55,6 +58,19 @@ class PluggyApi(private val clientId: String, private val clientSecret: String) 
         get("/accounts?itemId=$itemId").optJSONArray("results").objs()
 
     /** GET /v2/transactions (paginação por cursor). O /transactions antigo retorna 410. */
+    /** GET /investments?itemId=... (paginado). Nem todo banco/consentimento traz investimentos. */
+    fun investments(itemId: String): List<JSONObject> {
+        val all = mutableListOf<JSONObject>()
+        var page = 1
+        while (page <= 20) {
+            val res = get("/investments?itemId=$itemId&pageSize=500&page=$page")
+            all += res.optJSONArray("results").objs()
+            if (page >= res.optInt("totalPages", 1)) break
+            page++
+        }
+        return all
+    }
+
     fun transactions(accountId: String, from: String): List<JSONObject> {
         val all = mutableListOf<JSONObject>()
         var query: String? = "?accountId=$accountId&dateFrom=${from}T00:00:00.000Z"

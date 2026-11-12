@@ -1,5 +1,6 @@
 package app.meufin.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -11,7 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun App(vm: AppViewModel, onUnlock: () -> Unit) {
+fun App(vm: AppViewModel, onUnlock: () -> Unit, onInstallUpdate: (android.net.Uri) -> Unit) {
     if (!vm.configured) {
         SetupScreen(vm)
         return
@@ -21,35 +22,85 @@ fun App(vm: AppViewModel, onUnlock: () -> Unit) {
         return
     }
 
+    val allTxs by vm.txs.collectAsState()
+    val recents = remember(allTxs) {
+        allTxs.groupingBy { it.category }.eachCount().entries
+            .filter { it.key !in app.meufin.data.IGNORED_CATEGORIES }
+            .sortedByDescending { it.value }.map { it.key }.take(6)
+    }
+    var planSection by rememberSaveable { mutableIntStateOf(0) }
     var tab by rememberSaveable { mutableIntStateOf(0) }
+    var tabHistory by rememberSaveable { mutableStateOf(listOf<Int>()) }
     val snack = remember { SnackbarHostState() }
+    fun navigateTo(newTab: Int) {
+        if (newTab == tab) return
+        tabHistory = tabHistory + tab
+        tab = newTab
+    }
+    BackHandler(enabled = tabHistory.isNotEmpty() || tab != 0) {
+        if (tabHistory.isNotEmpty()) {
+            tab = tabHistory.last()
+            tabHistory = tabHistory.dropLast(1)
+        } else {
+            tab = 0
+        }
+    }
     LaunchedEffect(vm.message) {
         vm.message?.let {
             snack.showSnackbar(it)
             vm.message = null
         }
     }
+    vm.updateRelease?.let { release ->
+        AlertDialog(
+            onDismissRequest = { vm.updateRelease = null },
+            title = { Text("Atualização disponível") },
+            text = { Text("A versão ${release.version} está disponível. O APK será baixado e o Android pedirá confirmação para instalar.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    vm.downloadUpdate(onInstallUpdate)
+                    vm.updateRelease = null
+                }) { Text(if (vm.downloadingUpdate) "Baixando…" else "Atualizar") }
+            },
+            dismissButton = { TextButton(onClick = { vm.updateRelease = null }) { Text("Agora não") } }
+        )
+    }
 
+    CompositionLocalProvider(
+        LocalCategoryCreator provides { vm.addCategory(it) },
+        LocalRecentCategories provides recents
+    ) {
     Scaffold(
         snackbarHost = { SnackbarHost(snack) },
         bottomBar = {
-            NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-                NavigationBarItem(tab == 0, { tab = 0 }, { Icon(Icons.Default.Home, null) }, label = { Text("Início") })
-                NavigationBarItem(tab == 1, { tab = 1 }, { Icon(Icons.Default.List, null) }, label = { Text("Extrato") })
-                NavigationBarItem(tab == 2, { tab = 2 }, { Icon(Icons.Default.CheckCircle, null) }, label = { Text("Planejar") })
-                NavigationBarItem(tab == 3, { tab = 3 }, { Icon(Icons.Default.Menu, null) }, label = { Text("Mais") })
+            Column {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
+                    val colors = NavigationBarItemDefaults.colors(indicatorColor = MaterialTheme.colorScheme.primaryContainer)
+                    NavigationBarItem(tab == 0, { navigateTo(0) }, { Icon(Icons.Default.Home, null) }, label = { Text("Início") }, colors = colors)
+                    NavigationBarItem(tab == 1, { navigateTo(1) }, { Icon(Icons.Default.List, null) }, label = { Text("Extrato") }, colors = colors)
+                    NavigationBarItem(tab == 2, { navigateTo(2) }, { Icon(Icons.Default.AccountBox, null) }, label = { Text("Patrimônio") }, colors = colors)
+                    NavigationBarItem(tab == 3, { navigateTo(3) }, { Icon(Icons.Default.CheckCircle, null) }, label = { Text("Planejar") }, colors = colors)
+                    NavigationBarItem(tab == 4, { navigateTo(4) }, { Icon(Icons.Default.Menu, null) }, label = { Text("Mais") }, colors = colors)
+                }
             }
         }
     ) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
             if (vm.syncing) LinearProgressIndicator(Modifier.fillMaxWidth())
             when (tab) {
-                0 -> HomeScreen(vm, goPlan = { tab = 2 })
+                0 -> HomeScreen(
+                    vm,
+                    goPlan = { navigateTo(3) },
+                    goAlerts = { planSection = 6; navigateTo(3) }
+                )
                 1 -> ExtratoScreen(vm)
-                2 -> PlanScreen(vm)
+                2 -> NetWorthScreen(vm)
+                3 -> PlanScreen(vm, planSection) { planSection = it }
                 else -> MoreScreen(vm)
             }
         }
+    }
     }
 }
 

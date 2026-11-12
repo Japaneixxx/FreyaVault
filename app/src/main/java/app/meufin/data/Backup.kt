@@ -32,6 +32,14 @@ object Backup {
         o.put("metas", JSONArray().also { a ->
             dao.metasNow().forEach { a.put(JSONObject().put("txId", it.txId).put("note", it.note).put("ignored", it.ignored)) }
         })
+        o.put("netItems", JSONArray().also { a ->
+            dao.netItemsNow().forEach {
+                a.put(JSONObject().put("id", it.id).put("name", it.name).put("kind", it.kind).put("amount", it.amount))
+            }
+        })
+        o.put("envelopes", JSONArray().also { a ->
+            dao.envelopesNow().forEach { a.put(JSONObject().put("category", it.category).put("start", it.startMonth)) }
+        })
         o.put("manual", JSONArray().also { a ->
             dao.manualTxNow().forEach {
                 a.put(JSONObject().put("id", it.id).put("date", it.date).put("description", it.description)
@@ -56,6 +64,10 @@ object Backup {
         o.optJSONArray("metas").each {
             dao.putMeta(TxMeta(it.getString("txId"), it.str("note"), it.optBoolean("ignored"))); n++
         }
+        o.optJSONArray("netItems").each {
+            dao.putNetItem(NetItem(it.optLong("id"), it.getString("name"), it.getString("kind"), it.getDouble("amount"))); n++
+        }
+        o.optJSONArray("envelopes").each { dao.putEnvelope(Envelope(it.getString("category"), it.getString("start"))); n++ }
         o.optJSONArray("manual").each {
             dao.putTx(Tx(it.getString("id"), "manual", it.getString("date"), it.getString("description"),
                 it.getDouble("amount"), it.str("category"), false)); n++

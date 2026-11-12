@@ -70,11 +70,33 @@ class Repository(private val settings: Settings, private val dao: FinDao) {
                 val existing = txs.filterIndexed { i, _ -> res[i] == -1L }
                 if (existing.isNotEmpty()) dao.updateTx(existing)
             }
+
+            // Investimentos são opcionais: nem todo banco/consentimento os traz. Em falha, mantém o que já existia.
+            runCatching { api.investments(itemId) }.onSuccess { list ->
+                val found = list.filter { o -> o.str("status").let { it.isBlank() || it == "ACTIVE" } }.map { o ->
+                    Investment(
+                        id = o.getString("id"),
+                        itemId = itemId,
+                        institution = institution,
+                        name = o.str("name").ifBlank { "Investimento" },
+                        type = o.str("type").ifBlank { "OTHER" },
+                        balance = o.optDouble("balance", 0.0),
+                        amountOriginal = o.dbl("amountOriginal"),
+                        amountProfit = o.dbl("amountProfit"),
+                        annualRate = o.dbl("annualRate"),
+                        lastTwelveMonthsRate = o.dbl("lastTwelveMonthsRate"),
+                        currency = o.str("currencyCode").ifBlank { "BRL" }
+                    )
+                }
+                dao.deleteInvestmentsOf(itemId)
+                dao.upsertInvestments(found)
+            }
         }
 
         val bank = allAccounts.filter { it.type == "BANK" }.sumOf { it.balance }
         val cards = allAccounts.filter { it.type == "CREDIT" }.sumOf { it.balance }
         dao.putSnapshot(Snapshot(LocalDate.now().toString(), bank, cards))
+        dao.recordNetSnapshot()
         settings.widgetBank = bank
         settings.widgetCards = cards
         settings.lastSync = System.currentTimeMillis()

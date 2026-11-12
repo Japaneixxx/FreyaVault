@@ -30,11 +30,17 @@ class Settings(ctx: Context) {
     var hideValues: Boolean get() = bool("hide"); set(v) = put("hide", v)
     var lockEnabled: Boolean get() = bool("lock"); set(v) = put("lock", v)
     var alertsEnabled: Boolean get() = bool("alerts"); set(v) = put("alerts", v)
+    var checkUpdatesOnOpen: Boolean
+        get() = prefs.getBoolean("check_updates_on_open", true)
+        set(v) = put("check_updates_on_open", v)
 
     /** 0 = sistema, 1 = claro, 2 = escuro */
     var themeMode: Int
         get() = prefs.getInt("theme", 0)
         set(v) { prefs.edit().putInt("theme", v).apply() }
+
+    /** Categorias criadas pelo usuário, separadas por "|". */
+    var customCategories: String get() = str("custom_cats"); set(v) = put("custom_cats", v)
 
     // usados pelo widget
     var widgetBank: Double
@@ -45,6 +51,10 @@ class Settings(ctx: Context) {
         set(v) = put("w_cards", v.toString())
 
     // evita notificar a mesma coisa duas vezes
+    /** Alertas de cobrança que o usuário marcou como "não é um problema". */
+    fun dismissedKeys(): Set<String> =
+        prefs.all.keys.filter { it.startsWith("seen_dismiss_") }.map { it.removePrefix("seen_dismiss_") }.toSet()
+
     fun seen(key: String): Boolean = bool("seen_$key")
     fun markSeen(key: String) = put("seen_$key", true)
 

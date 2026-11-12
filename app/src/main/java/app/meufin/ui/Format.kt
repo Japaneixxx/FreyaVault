@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import java.text.NumberFormat
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -42,3 +43,7 @@ fun ago(ms: Long): String {
         else -> "há ${m / 1440} d"
     }
 }
+
+fun weekdayName(d: DayOfWeek): String = d.getDisplayName(TextStyle.FULL, ptBR)
+
+fun pct(v: Double): String = String.format(ptBR, "%.2f%%", v)

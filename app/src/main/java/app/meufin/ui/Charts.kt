@@ -50,7 +50,7 @@ fun MonthlyBars(data: List<MonthSum>, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun DonutChart(data: List<Pair<String, Double>>, modifier: Modifier = Modifier) {
+fun DonutChart(data: List<Pair<String, Double>>, modifier: Modifier = Modifier, centerLabel: String = "Despesas") {
     val total = data.sumOf { it.second }.coerceAtLeast(1.0)
     val track = MaterialTheme.colorScheme.surfaceVariant
     Box(modifier.size(170.dp), contentAlignment = Alignment.Center) {
@@ -70,7 +70,7 @@ fun DonutChart(data: List<Pair<String, Double>>, modifier: Modifier = Modifier) 
             }
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("Despesas", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(centerLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(money(data.sumOf { it.second }), style = MaterialTheme.typography.titleMedium)
         }
     }

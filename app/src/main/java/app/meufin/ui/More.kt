@@ -34,6 +34,7 @@ fun MoreScreen(vm: AppViewModel) {
     val groups = remember(accounts) { accounts.groupBy { it.institution } }
     var confirmWipe by remember { mutableStateOf(false) }
     var showRules by remember { mutableStateOf(false) }
+    var showCats by remember { mutableStateOf(false) }
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -65,6 +66,9 @@ fun MoreScreen(vm: AppViewModel) {
         } else {
             vm.setAlerts(false)
             vm.message = "Permissão de notificações negada"
+            if (!Alerts.openNotificationSettings(ctx)) {
+                vm.message = "Não foi possível abrir as configurações de notificações"
+            }
         }
     }
 
@@ -120,8 +124,17 @@ fun MoreScreen(vm: AppViewModel) {
                             }
                         }
                 }
+                else if (!Alerts.notificationsEnabled(ctx) && !Alerts.openNotificationSettings(ctx)) {
+                    vm.message = "Não foi possível abrir as configurações de notificações"
+                }
                 else vm.setAlerts(true)
             }
+            Spacer(Modifier.height(10.dp))
+            SwitchRow(
+                "Verificar atualizações ao abrir",
+                "Consulta automaticamente as Releases do GitHub sempre que o app é aberto.",
+                vm.checkUpdatesOnOpen
+            ) { vm.updateCheckUpdatesOnOpen(it) }
             Spacer(Modifier.height(10.dp))
             SwitchRow("Ocultar valores", "Esconde saldos e valores em todo o app.", Privacy.hidden) { vm.toggleHide() }
         }
@@ -144,6 +157,13 @@ fun MoreScreen(vm: AppViewModel) {
             )
             Spacer(Modifier.height(8.dp))
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedButton(
+                    onClick = { vm.checkForUpdate() },
+                    enabled = !vm.checkingUpdate && !vm.downloadingUpdate,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(if (vm.checkingUpdate) "Verificando atualizações…" else "Verificar atualizações")
+                }
                 OutlinedButton(onClick = { vm.sync() }, enabled = !vm.syncing, modifier = Modifier.fillMaxWidth()) {
                     Text(if (vm.syncing) "Sincronizando…" else "Sincronizar agora")
                 }
@@ -153,6 +173,9 @@ fun MoreScreen(vm: AppViewModel) {
                 }, modifier = Modifier.fillMaxWidth()) { Text("Compartilhar resumo do mês") }
                 OutlinedButton(onClick = { csvExporter.launch("meu-financeiro.csv") }, modifier = Modifier.fillMaxWidth()) {
                     Text("Exportar transações (CSV)")
+                }
+                OutlinedButton(onClick = { showCats = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Categorias personalizadas (${Cats.custom.size})")
                 }
                 OutlinedButton(onClick = { showRules = true }, modifier = Modifier.fillMaxWidth()) {
                     Text("Minhas regras de categoria (${rules.size})")
@@ -190,6 +213,40 @@ fun MoreScreen(vm: AppViewModel) {
             dismissButton = { TextButton(onClick = { confirmWipe = false }) { Text("Cancelar") } }
         )
     }
+    if (showCats) {
+        var newCat by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showCats = false },
+            title = { Text("Categorias personalizadas") },
+            confirmButton = { TextButton(onClick = { showCats = false }) { Text("Fechar") } },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(
+                            newCat, { newCat = it }, label = { Text("Nova categoria") }, singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(
+                            enabled = newCat.isNotBlank(),
+                            onClick = { vm.addCategory(newCat); newCat = "" }
+                        ) { Text("Adicionar") }
+                    }
+                    if (Cats.custom.isEmpty()) {
+                        Text("Crie categorias como Pet, Presentes ou Academia. Elas aparecem nos filtros, orçamentos e lançamentos.",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Cats.custom.forEach { c ->
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            CategoryAvatar(c, 32.dp)
+                            Spacer(Modifier.width(10.dp))
+                            Text(c, Modifier.weight(1f))
+                            TextButton(onClick = { vm.removeCategory(c) }) { Text("Remover") }
+                        }
+                    }
+                }
+            }
+        )
+    }
     if (showRules) {
         AlertDialog(
             onDismissRequest = { showRules = false },
@@ -225,69 +282,5 @@ private fun SwitchRow(title: String, subtitle: String, checked: Boolean, onChang
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Switch(checked = checked, onCheckedChange = onChange)
-    }
-}
-
-@Composable
-fun SetupScreen(vm: AppViewModel) {
-    Scaffold { pad ->
-        Column(Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp)) {
-            Text("Freya", style = MaterialTheme.typography.headlineLarge)
-            Text(
-                stringResource(R.string.developer_name),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                "Seus dados ficam só neste aparelho. As credenciais são guardadas criptografadas e o app fala direto com o Pluggy.",
-                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(20.dp))
-            NCard(Modifier.fillMaxWidth(), container = MaterialTheme.colorScheme.primaryContainer) {
-                Text(
-                    "1. Conecte seus bancos em meu.pluggy.ai\n" +
-                        "2. No dashboard.pluggy.ai, crie uma Application, abra a tela Demo e conecte o conector MeuPluggy\n" +
-                        "3. Copie o Client ID, o Client Secret e o Item ID de cada banco (até 5)",
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
-            Spacer(Modifier.height(20.dp))
-            CredentialsForm(vm, "Conectar")
-            if (vm.syncing) {
-                Spacer(Modifier.height(12.dp))
-                LinearProgressIndicator(Modifier.fillMaxWidth())
-            }
-            vm.message?.let {
-                Spacer(Modifier.height(12.dp))
-                Text(it, color = MaterialTheme.colorScheme.error)
-            }
-        }
-    }
-}
-
-@Composable
-fun CredentialsForm(vm: AppViewModel, buttonLabel: String) {
-    var cid by remember { mutableStateOf(vm.settings.clientId) }
-    var secret by remember { mutableStateOf(vm.settings.clientSecret) }
-    var items by remember { mutableStateOf(vm.settings.itemIds) }
-
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedTextField(cid, { cid = it }, label = { Text("Client ID") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(
-            secret, { secret = it }, label = { Text("Client Secret") }, singleLine = true,
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            modifier = Modifier.fillMaxWidth()
-        )
-        OutlinedTextField(
-            items, { items = it }, label = { Text("Item IDs (vírgula ou linha)") },
-            minLines = 2, modifier = Modifier.fillMaxWidth()
-        )
-        Button(
-            onClick = { vm.saveCredentials(cid.trim(), secret.trim(), items.trim()) },
-            enabled = cid.isNotBlank() && secret.isNotBlank() && items.isNotBlank() && !vm.syncing,
-            modifier = Modifier.fillMaxWidth()
-        ) { Text(buttonLabel) }
     }
 }

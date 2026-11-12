@@ -60,15 +60,22 @@ private fun normalizeText(s: String): String =
         .replace(Regex("\\s+"), " ")
         .trim()
 
-fun ruleKeyFor(tx: Tx): String = normalizeText(tx.description).take(28).trim().ifBlank { tx.id }
+/** Chave da regra de categoria: nome já sanitizado ("Uber"), sem o texto repetido do banco. */
+fun ruleKeyFor(tx: Tx): String =
+    normalizeText(sanitize(tx.description, tx.amount).title).take(28).trim().ifBlank { tx.id }
+
+/** Chave usada até a v1.4: mantida só para continuar reconhecendo regras já aprendidas. */
+fun legacyRuleKeyFor(tx: Tx): String = normalizeText(tx.description).take(28).trim().ifBlank { tx.id }
 
 /** Ordem: regra do usuário -> categoria Pluggy -> palavras-chave -> categoria bruta -> padrão. */
 fun categorize(tx: Tx, rules: Map<String, String>): String {
     rules[ruleKeyFor(tx)]?.let { return it }
+    rules[legacyRuleKeyFor(tx)]?.let { return it }
     if (tx.accountId == "manual" && tx.pluggyCategory.isNotBlank()) return tx.pluggyCategory
     pluggyMap[tx.pluggyCategory]?.let { return it }
     val text = normalizeText(tx.description)
     keywords.firstOrNull { (_, words) -> words.any { text.contains(it) } }?.let { return it.first }
+    kindCategory(sanitize(tx.description, tx.amount).kind)?.let { return it }
     if (tx.pluggyCategory.isNotBlank()) return tx.pluggyCategory
     return if (tx.amount > 0) "Receitas" else "Outros"
 }

@@ -2,10 +2,12 @@ package app.meufin
 
 import android.Manifest
 import android.app.PendingIntent
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.provider.Settings as AndroidSettings
 import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -28,6 +30,22 @@ object Alerts {
     fun canNotify(ctx: Context): Boolean =
         Build.VERSION.SDK_INT < 33 ||
             ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+
+    fun notificationsEnabled(ctx: Context): Boolean =
+        canNotify(ctx) && NotificationManagerCompat.from(ctx).areNotificationsEnabled()
+
+    fun openNotificationSettings(ctx: Context): Boolean {
+        return try {
+            ctx.startActivity(
+                Intent(AndroidSettings.ACTION_APP_NOTIFICATION_SETTINGS)
+                    .putExtra(AndroidSettings.EXTRA_APP_PACKAGE, ctx.packageName)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+            true
+        } catch (_: ActivityNotFoundException) {
+            false
+        }
+    }
 
     private fun notify(ctx: Context, id: Int, title: String, text: String) {
         if (!canNotify(ctx)) return
@@ -67,15 +85,27 @@ object Alerts {
 
         // 1) orçamentos
         val items = buildItems(dao.txNow(), dao.rulesNow(), dao.metasNow())
-        val spent = spendByCategory(items.filter { !it.ignored }.inMonth(month)).toMap()
-        dao.budgetsNow().forEach { b ->
+        val real = items.filter { !it.ignored }
+        val spent = spendByCategory(real.inMonth(month)).toMap()
+        // envelopes: o limite do mês inclui a sobra acumulada dos meses anteriores
+        effectiveBudgets(dao.budgetsNow(), dao.envelopesNow(), real).forEach { b ->
             val s = spent[b.category] ?: 0.0
-            val pct = if (b.limitAmount > 0) s / b.limitAmount else 0.0
+            val pct = if (b.available > 0) s / b.available else 0.0
             val level = when { pct >= 1.0 -> 100; pct >= 0.8 -> 80; else -> 0 }
             if (level > 0 && !settings.seen("b_${b.category}_${month}_$level")) {
                 settings.markSeen("b_${b.category}_${month}_$level")
                 val title = if (level == 100) "Orçamento estourado: ${b.category}" else "Orçamento quase no limite: ${b.category}"
-                notify(ctx, ("b" + b.category + month + level).hashCode(), title, "Você gastou ${m(s)} de ${m(b.limitAmount)} neste mês.")
+                notify(ctx, ("b" + b.category + month + level).hashCode(), title, "Você gastou ${m(s)} de ${m(b.available)} neste mês.")
+            }
+        }
+
+        // 1b) cobranças duplicadas ou que subiram de preço
+        val dismissed = settings.dismissedKeys()
+        detectChargeAlerts(items).filter { it.key !in dismissed }.forEach { a ->
+            if (!settings.seen("chg_${a.key}")) {
+                settings.markSeen("chg_${a.key}")
+                val title = if (a.isDuplicate) "Possível cobrança duplicada: ${a.title}" else "Cobrança mais cara: ${a.title}"
+                notify(ctx, ("chg" + a.key).hashCode(), title, a.describe(::m))
             }
         }
 
