@@ -109,9 +109,11 @@ object Alerts {
             }
         }
 
-        // 2) contas a pagar
-        dao.billsNow().filter { it.lastPaidMonth != month }.forEach { b ->
-            val due = YearMonth.now().atDay(minOf(b.dueDay, YearMonth.now().lengthOfMonth()))
+        // 2) compromissos (fixas, variáveis e financiamentos)
+        val ymNow = YearMonth.now()
+        val payments = dao.billPaymentsNow()
+        dao.billsNow().filter { it.lastPaidMonth != month && isBillActive(it, ymNow) }.forEach { b ->
+            val due = billDueDate(b, ymNow)
             val days = Duration.between(today.atStartOfDay(), due.atStartOfDay()).toDays().toInt()
             if (days in -7..3 && !settings.seen("bill_${b.id}_$today")) {
                 settings.markSeen("bill_${b.id}_$today")
@@ -120,7 +122,19 @@ object Alerts {
                     days == 0 -> "vence hoje"
                     else -> "vence em $days dia(s)"
                 }
-                notify(ctx, ("bill" + b.id + today).hashCode(), "Conta: ${b.name}", "${b.name} $whenTxt (${m(b.amount)}).")
+                val approx = if (b.kind == KIND_VARIABLE) "cerca de " else ""
+                notify(ctx, ("bill" + b.id + today).hashCode(), "Conta: ${b.name}", "${b.name} $whenTxt ($approx${m(billEstimate(b, payments))}).")
+            }
+        }
+
+        // 2b) dia de receber o salário previsto
+        dao.incomesNow().forEach { i ->
+            val d = incomeDate(i, ymNow)
+            val days = Duration.between(today.atStartOfDay(), d.atStartOfDay()).toDays().toInt()
+            if (days in 0..1 && !settings.seen("inc_${i.id}_$d")) {
+                settings.markSeen("inc_${i.id}_$d")
+                val whenTxt = if (days == 0) "é hoje" else "é amanhã"
+                notify(ctx, ("inc" + i.id + d).hashCode(), "💰 ${i.name} previsto", "O recebimento previsto $whenTxt: ${m(i.amount)}.")
             }
         }
 

@@ -39,6 +39,9 @@ class Settings(ctx: Context) {
         get() = prefs.getInt("theme", 0)
         set(v) { prefs.edit().putInt("theme", v).apply() }
 
+    /** Última versão cujo "o que há de novo" o usuário já viu. */
+    var lastSeenVersion: String get() = str("last_seen_version"); set(v) = put("last_seen_version", v)
+
     /** Categorias criadas pelo usuário, separadas por "|". */
     var customCategories: String get() = str("custom_cats"); set(v) = put("custom_cats", v)
 

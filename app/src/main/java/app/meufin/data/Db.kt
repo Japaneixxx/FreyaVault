@@ -51,14 +51,35 @@ data class Goal(
 @Entity(tableName = "tx_meta")
 data class TxMeta(@PrimaryKey val txId: String, val note: String = "", val ignored: Boolean = false)
 
-/** Conta a pagar recorrente (aluguel, escola, internet...). */
+/**
+ * Compromisso mensal: conta fixa (internet), variável (luz, água) ou financiamento com parcelas definidas.
+ * [kind] nulo = fixa (dados antigos).
+ */
 @Entity(tableName = "bills")
 data class Bill(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
-    val amount: Double,
+    val amount: Double,              // fixa: valor; variável: estimativa inicial; financiamento: valor da parcela
     val dueDay: Int,
-    val lastPaidMonth: String = ""   // "2026-11" quando paga no mês
+    val lastPaidMonth: String = "",  // "2026-11" quando paga no mês
+    val kind: String? = null,        // FIXED | VARIABLE | INSTALLMENT
+    val totalInstallments: Int? = null,
+    val firstMonth: String? = null,  // mês da 1ª parcela (yyyy-MM)
+    val matchText: String? = null    // palavra do extrato usada para dar baixa automática
+)
+
+/** Quanto realmente foi pago em cada mês (base da média das contas variáveis). */
+@Entity(tableName = "bill_payments", primaryKeys = ["billId", "month"])
+data class BillPayment(val billId: Long, val month: String, val amount: Double)
+
+/** Receita prevista (salário etc.): dia fixo do mês ou N-ésimo dia útil. */
+@Entity(tableName = "incomes")
+data class Income(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val amount: Double,
+    val day: Int,
+    val businessDay: Boolean = false
 )
 
 /** Foto diária do saldo, para o gráfico de evolução. */
@@ -112,6 +133,8 @@ interface FinDao {
     @Query("SELECT * FROM net_items ORDER BY kind, name") fun netItems(): Flow<List<NetItem>>
     @Query("SELECT * FROM envelopes") fun envelopes(): Flow<List<Envelope>>
     @Query("SELECT * FROM net_snapshots ORDER BY date") fun netSnapshots(): Flow<List<NetSnapshot>>
+    @Query("SELECT * FROM bill_payments") fun billPayments(): Flow<List<BillPayment>>
+    @Query("SELECT * FROM incomes ORDER BY day, name") fun incomes(): Flow<List<Income>>
 
     // leituras pontuais (alertas em segundo plano e backup)
     @Query("SELECT * FROM accounts") suspend fun accountsNow(): List<Account>
@@ -125,6 +148,8 @@ interface FinDao {
     @Query("SELECT * FROM investments") suspend fun investmentsNow(): List<Investment>
     @Query("SELECT * FROM net_items") suspend fun netItemsNow(): List<NetItem>
     @Query("SELECT * FROM envelopes") suspend fun envelopesNow(): List<Envelope>
+    @Query("SELECT * FROM bill_payments") suspend fun billPaymentsNow(): List<BillPayment>
+    @Query("SELECT * FROM incomes") suspend fun incomesNow(): List<Income>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertAccounts(list: List<Account>)
     @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insertTx(list: List<Tx>): List<Long>
@@ -143,6 +168,13 @@ interface FinDao {
     @Query("DELETE FROM investments WHERE itemId = :itemId") suspend fun deleteInvestmentsOf(itemId: String)
     @Query("DELETE FROM net_items WHERE id = :id") suspend fun deleteNetItem(id: Long)
     @Query("DELETE FROM envelopes WHERE category = :c") suspend fun deleteEnvelope(c: String)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putBillPayment(p: BillPayment)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putIncome(i: Income)
+    @Query("DELETE FROM bill_payments WHERE billId = :billId AND month = :month") suspend fun deleteBillPayment(billId: Long, month: String)
+    @Query("DELETE FROM bill_payments WHERE billId = :billId") suspend fun deletePaymentsOf(billId: Long)
+    @Query("DELETE FROM incomes WHERE id = :id") suspend fun deleteIncome(id: Long)
+    @Query("DELETE FROM bill_payments") suspend fun clearBillPayments()
+    @Query("DELETE FROM incomes") suspend fun clearIncomes()
     @Query("DELETE FROM investments") suspend fun clearInvestments()
     @Query("DELETE FROM net_items") suspend fun clearNetItems()
     @Query("DELETE FROM envelopes") suspend fun clearEnvelopes()
@@ -210,11 +242,28 @@ private val MIGRATION_3_4 = object : Migration(3, 4) {
     }
 }
 
+private val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE bills ADD COLUMN kind TEXT")
+        db.execSQL("ALTER TABLE bills ADD COLUMN totalInstallments INTEGER")
+        db.execSQL("ALTER TABLE bills ADD COLUMN firstMonth TEXT")
+        db.execSQL("ALTER TABLE bills ADD COLUMN matchText TEXT")
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `bill_payments` (`billId` INTEGER NOT NULL, `month` TEXT NOT NULL, " +
+                "`amount` REAL NOT NULL, PRIMARY KEY(`billId`, `month`))"
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `incomes` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "`name` TEXT NOT NULL, `amount` REAL NOT NULL, `day` INTEGER NOT NULL, `businessDay` INTEGER NOT NULL)"
+        )
+    }
+}
+
 @Database(
     entities = [Account::class, Tx::class, Rule::class, Budget::class, Goal::class,
         TxMeta::class, Bill::class, Snapshot::class, Investment::class, NetItem::class,
-        Envelope::class, NetSnapshot::class],
-    version = 4, exportSchema = false
+        Envelope::class, NetSnapshot::class, BillPayment::class, Income::class],
+    version = 5, exportSchema = false
 )
 abstract class Db : RoomDatabase() {
     abstract fun dao(): FinDao
@@ -223,7 +272,7 @@ abstract class Db : RoomDatabase() {
         @Volatile private var inst: Db? = null
         fun get(ctx: Context): Db = inst ?: synchronized(this) {
             inst ?: Room.databaseBuilder(ctx.applicationContext, Db::class.java, "fin.db")
-                .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .fallbackToDestructiveMigrationFrom(1) // v1 só tinha dados re-sincronizáveis
                 .build().also { inst = it }
         }

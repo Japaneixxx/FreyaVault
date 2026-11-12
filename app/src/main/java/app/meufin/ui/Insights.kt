@@ -2,11 +2,14 @@ package app.meufin.ui
 
 import app.meufin.data.Account
 import app.meufin.data.Bill
+import app.meufin.data.BillPayment
+import app.meufin.data.Income
 import app.meufin.data.Rule
 import app.meufin.data.Tx
 import app.meufin.data.TxMeta
 import app.meufin.data.categorize
 import app.meufin.data.ruleKeyFor
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.temporal.ChronoUnit
@@ -138,29 +141,130 @@ fun detectInstallments(txs: List<TxItem>): List<Installment> {
         .sortedByDescending { it.remainingAmount }
 }
 
-// ---------------- Vencimentos ----------------
-data class Upcoming(val name: String, val date: LocalDate, val amount: Double, val kind: String, val overdue: Boolean)
+// ---------------- Compromissos: contas fixas, variáveis e financiamentos ----------------
+const val KIND_FIXED = "FIXED"
+const val KIND_VARIABLE = "VARIABLE"
+const val KIND_INSTALLMENT = "INSTALLMENT"
+
+fun Bill.kindName(): String = when (kind) {
+    KIND_VARIABLE -> "Variável"
+    KIND_INSTALLMENT -> "Financiamento"
+    else -> "Fixa"
+}
 
 fun billDueDate(b: Bill, ym: YearMonth = YearMonth.now()): LocalDate =
     ym.atDay(minOf(b.dueDay, ym.lengthOfMonth()))
 
 fun isPaid(b: Bill) = b.lastPaidMonth == monthKey()
 
-/** Próximos vencimentos (contas a pagar não pagas + faturas de cartão) nos próximos [days] dias. */
-fun upcoming(bills: List<Bill>, accounts: List<Account>, days: Long = 15): List<Upcoming> {
-    val today = LocalDate.now()
-    val out = mutableListOf<Upcoming>()
-    bills.filter { !isPaid(it) }.forEach {
-        val d = billDueDate(it)
-        if (!d.isAfter(today.plusDays(days))) out += Upcoming(it.name, d, it.amount, "Conta", d.isBefore(today))
+/** Número da parcela no mês [ym] (1 = primeira); nulo se não for financiamento. */
+fun installmentNumber(b: Bill, ym: YearMonth = YearMonth.now()): Int? {
+    if (b.kind != KIND_INSTALLMENT) return null
+    val first = runCatching { YearMonth.parse(b.firstMonth ?: return null) }.getOrNull() ?: return null
+    return ChronoUnit.MONTHS.between(first, ym).toInt() + 1
+}
+
+/** Fixas e variáveis valem sempre; financiamento só entre a 1ª e a última parcela. */
+fun isBillActive(b: Bill, ym: YearMonth = YearMonth.now()): Boolean {
+    val n = installmentNumber(b, ym) ?: return true
+    return n in 1..(b.totalInstallments ?: Int.MAX_VALUE)
+}
+
+/** Valor esperado: variáveis usam a média dos últimos 3 pagamentos (ou a estimativa informada). */
+fun billEstimate(b: Bill, payments: List<BillPayment>): Double {
+    if (b.kind != KIND_VARIABLE) return b.amount
+    val last = payments.filter { it.billId == b.id }.sortedByDescending { it.month }.take(3).map { it.amount }
+    return if (last.isEmpty()) b.amount else last.average()
+}
+
+/** Parcelas que ainda faltam, incluindo a deste mês se ela ainda não foi paga. */
+fun remainingInstallments(b: Bill): Int {
+    val total = b.totalInstallments ?: return 0
+    val n = installmentNumber(b) ?: return 0
+    return (total - n + if (isPaid(b)) 0 else 1).coerceIn(0, total)
+}
+
+fun installmentEnd(b: Bill): YearMonth? {
+    val total = b.totalInstallments ?: return null
+    val first = runCatching { YearMonth.parse(b.firstMonth ?: return null) }.getOrNull() ?: return null
+    return first.plusMonths((total - 1).toLong())
+}
+
+// ---------------- Receitas previstas e agenda financeira ----------------
+/** Dia de recebimento no mês: N-ésimo dia útil, ou dia fixo (se cair no fim de semana, antecipa para sexta). */
+fun incomeDate(i: Income, ym: YearMonth = YearMonth.now()): LocalDate {
+    if (i.businessDay) {
+        val n = i.day.coerceIn(1, 23)
+        var d = ym.atDay(1)
+        var count = 0
+        while (d.monthValue == ym.monthValue) {
+            if (d.dayOfWeek != DayOfWeek.SATURDAY && d.dayOfWeek != DayOfWeek.SUNDAY) {
+                count++
+                if (count == n) return d
+            }
+            d = d.plusDays(1)
+        }
+        return ym.atEndOfMonth()
     }
-    accounts.filter { it.type == "CREDIT" && it.dueDate != null && it.balance > 0 }.forEach {
-        val d = runCatching { LocalDate.parse(it.dueDate) }.getOrNull() ?: return@forEach
-        if (!d.isBefore(today) && !d.isAfter(today.plusDays(days))) {
-            out += Upcoming("Fatura ${it.institution}", d, it.balance, "Cartão", false)
+    var d = ym.atDay(minOf(i.day.coerceAtLeast(1), ym.lengthOfMonth()))
+    while (d.dayOfWeek == DayOfWeek.SATURDAY || d.dayOfWeek == DayOfWeek.SUNDAY) d = d.minusDays(1)
+    return d
+}
+
+/** Próxima data de recebimento a partir de hoje (neste mês ou no seguinte). */
+fun nextIncomeDate(i: Income): LocalDate {
+    val d = incomeDate(i)
+    return if (!d.isBefore(LocalDate.now())) d else incomeDate(i, YearMonth.now().plusMonths(1))
+}
+
+data class AgendaEvent(
+    val date: LocalDate,
+    val name: String,
+    val amount: Double,        // com sinal: entrada positiva, saída negativa
+    val type: String,          // INCOME | BILL | CARD
+    val note: String?,
+    val balanceAfter: Double   // saldo previsto nas contas depois deste evento
+)
+
+/** Linha do tempo dos próximos [days] dias: receitas, contas, parcelas e faturas, com o saldo previsto. */
+fun buildAgenda(
+    bank: Double, bills: List<Bill>, payments: List<BillPayment>,
+    incomes: List<Income>, accounts: List<Account>, days: Long = 45
+): List<AgendaEvent> {
+    data class Raw(val date: LocalDate, val name: String, val amount: Double, val type: String, val note: String?)
+    val today = LocalDate.now()
+    val limit = today.plusDays(days)
+    val raw = mutableListOf<Raw>()
+
+    (0..2).map { YearMonth.now().plusMonths(it.toLong()) }.forEach { ym ->
+        bills.forEach { b ->
+            if (!isBillActive(b, ym)) return@forEach
+            if (ym == YearMonth.now() && isPaid(b)) return@forEach
+            val due = billDueDate(b, ym)
+            if (due.isAfter(limit)) return@forEach
+            val overdue = due.isBefore(today)
+            val parts = mutableListOf<String>()
+            installmentNumber(b, ym)?.let { n -> parts += "parcela $n/${b.totalInstallments ?: "?"}" }
+            if (b.kind == KIND_VARIABLE) parts += "estimado"
+            if (overdue) parts += "atrasada"
+            raw += Raw(if (overdue) today else due, b.name, -billEstimate(b, payments), "BILL", parts.joinToString(" · ").ifBlank { null })
+        }
+        incomes.forEach { i ->
+            val d = incomeDate(i, ym)
+            if (!d.isBefore(today) && !d.isAfter(limit)) raw += Raw(d, i.name, i.amount, "INCOME", null)
         }
     }
-    return out.sortedBy { it.date }
+    accounts.filter { it.type == "CREDIT" && it.balance > 0 }.forEach { a ->
+        val d = a.dueDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return@forEach
+        if (!d.isBefore(today) && !d.isAfter(limit)) raw += Raw(d, "Fatura ${a.institution}", -a.balance, "CARD", a.name)
+    }
+
+    var balance = bank
+    return raw.sortedWith(compareBy<Raw> { it.date }.thenByDescending { it.amount > 0 })
+        .map { r ->
+            balance += r.amount
+            AgendaEvent(r.date, r.name, r.amount, r.type, r.note, balance)
+        }
 }
 
 fun monthSummaryText(real: List<TxItem>, month: String): String {

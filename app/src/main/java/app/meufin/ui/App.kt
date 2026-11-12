@@ -66,6 +66,10 @@ fun App(vm: AppViewModel, onUnlock: () -> Unit, onInstallUpdate: (android.net.Ur
         )
     }
 
+    vm.whatsNewFrom?.let { from ->
+        ChangelogSheet(notesSince(from, vm.currentVersion), "Novidades do Freya", vm.currentVersion) { vm.dismissWhatsNew() }
+    }
+
     CompositionLocalProvider(
         LocalCategoryCreator provides { vm.addCategory(it) },
         LocalRecentCategories provides recents
@@ -92,7 +96,8 @@ fun App(vm: AppViewModel, onUnlock: () -> Unit, onInstallUpdate: (android.net.Ur
                 0 -> HomeScreen(
                     vm,
                     goPlan = { navigateTo(3) },
-                    goAlerts = { planSection = 6; navigateTo(3) }
+                    goAlerts = { planSection = PlanSection.CHARGES; navigateTo(3) },
+                    goAgenda = { planSection = PlanSection.AGENDA; navigateTo(3) }
                 )
                 1 -> ExtratoScreen(vm)
                 2 -> NetWorthScreen(vm)

@@ -20,6 +20,9 @@ import java.net.UnknownHostException
 import java.util.Locale
 import java.util.UUID
 import android.net.Uri
+import app.meufin.BuildConfig
+import java.time.YearMonth
+import kotlin.math.abs
 import kotlinx.coroutines.flow.MutableStateFlow
 
 data class TxItem(
@@ -54,6 +57,8 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     val investments = dao.investments().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val netItems = dao.netItems().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val envelopes = dao.envelopes().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val billPayments = dao.billPayments().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val incomes = dao.incomes().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val netSnapshots = dao.netSnapshots().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val txs = combine(dao.transactions(), dao.rules(), dao.metas()) { list, r, m -> buildItems(list, r, m) }
@@ -66,6 +71,26 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     val chargeAlerts = combine(txs, dismissed) { list, gone ->
         detectChargeAlerts(list).filter { it.key !in gone }
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** Versão anterior vista pelo usuário (vazia = desconhecida). Não nulo => mostrar "o que há de novo". */
+    var whatsNewFrom by mutableStateOf<String?>(null)
+    val currentVersion: String = BuildConfig.VERSION_NAME
+
+    init {
+        val seen = settings.lastSeenVersion
+        when {
+            seen == currentVersion -> Unit
+            seen.isBlank() && !settings.configured -> settings.lastSeenVersion = currentVersion // instalação nova
+            // versão sem entrada no histórico (ex.: só correção): não incomoda o usuário
+            notesSince(seen, currentVersion).isEmpty() -> settings.lastSeenVersion = currentVersion
+            else -> whatsNewFrom = seen
+        }
+    }
+
+    fun dismissWhatsNew() {
+        settings.lastSeenVersion = currentVersion
+        whatsNewFrom = null
+    }
 
     var configured by mutableStateOf(settings.configured)
     var connecting by mutableStateOf(false)
@@ -139,7 +164,9 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
             try {
                 val warnings = Repository(settings, dao).sync()
                 lastSync = settings.lastSync
+                val matched = withContext(Dispatchers.IO) { matchBillPayments() }
                 message = warnings.firstOrNull()
+                    ?: if (matched > 0) "$matched conta(s) marcada(s) como paga(s) pelo extrato" else null
                 BalanceWidget.refresh(app)
                 Alerts.check(app)
             } catch (e: UnknownHostException) {
@@ -335,11 +362,65 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     }
 
     fun deleteBill(bill: Bill) {
-        viewModelScope.launch { dao.deleteBill(bill.id) }
+        viewModelScope.launch {
+            dao.deleteBill(bill.id)
+            dao.deletePaymentsOf(bill.id)
+        }
     }
 
-    fun setBillPaid(bill: Bill, paid: Boolean) {
-        viewModelScope.launch { dao.putBill(bill.copy(lastPaidMonth = if (paid) monthKey() else "")) }
+    /** Marca como paga no mês. [actual] é o valor real (contas variáveis); sem ele, usa o valor esperado. */
+    fun setBillPaid(bill: Bill, paid: Boolean, actual: Double? = null) {
+        viewModelScope.launch {
+            val month = monthKey()
+            dao.putBill(bill.copy(lastPaidMonth = if (paid) month else ""))
+            if (paid) dao.putBillPayment(BillPayment(bill.id, month, actual ?: billEstimate(bill, billPayments.value)))
+            else dao.deleteBillPayment(bill.id, month)
+        }
+    }
+
+    fun saveIncome(income: Income) {
+        viewModelScope.launch { dao.putIncome(income) }
+    }
+
+    fun deleteIncome(income: Income) {
+        viewModelScope.launch { dao.deleteIncome(income.id) }
+    }
+
+    /**
+     * Dá baixa em compromissos cuja palavra-chave apareceu no extrato do mês.
+     * Contas fixas/financiamentos só casam se o valor estiver até 25% do esperado.
+     */
+    private suspend fun matchBillPayments(): Int {
+        val ym = YearMonth.now()
+        val month = ym.toString()
+        val candidates = dao.billsNow().filter {
+            it.lastPaidMonth != month && !it.matchText.isNullOrBlank() && isBillActive(it, ym)
+        }
+        if (candidates.isEmpty()) return 0
+        val expenses = buildItems(dao.txNow(), dao.rulesNow(), dao.metasNow())
+            .filter { it.tx.amount < 0 && !it.manual && !it.tx.pending && it.tx.date.startsWith(month) }
+        var count = 0
+        candidates.forEach { b ->
+            val key = foldText(b.matchText.orEmpty().trim())
+            val hit = expenses.filter {
+                foldText(it.tx.description).contains(key) &&
+                    (b.kind == KIND_VARIABLE || abs(-it.tx.amount - b.amount) <= b.amount * 0.25)
+            }.maxByOrNull { it.tx.date }
+            if (hit != null) {
+                dao.putBill(b.copy(lastPaidMonth = month))
+                dao.putBillPayment(BillPayment(b.id, month, -hit.tx.amount))
+                count++
+            }
+        }
+        return count
+    }
+
+    fun checkBillPayments() {
+        viewModelScope.launch {
+            val n = withContext(Dispatchers.IO) { matchBillPayments() }
+            message = if (n > 0) "$n conta(s) marcada(s) como paga(s) pelo extrato"
+            else "Nenhum pagamento novo encontrado no extrato"
+        }
     }
 
     // ----- exportação / backup / limpeza -----
@@ -377,6 +458,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
             dao.clearTx(); dao.clearAccounts(); dao.clearRules()
             dao.clearBudgets(); dao.clearGoals(); dao.clearMetas()
             dao.clearBills(); dao.clearSnapshots()
+            dao.clearBillPayments(); dao.clearIncomes()
             dao.clearInvestments(); dao.clearNetItems(); dao.clearEnvelopes(); dao.clearNetSnapshots()
             settings.lastSync = 0L
             lastSync = 0L

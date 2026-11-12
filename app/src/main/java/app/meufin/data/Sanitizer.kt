@@ -107,6 +107,9 @@ private fun fold(s: String): String = buildString(s.length) {
     }
 }.uppercase()
 
+/** Texto sem acentos e em maiúsculas, para comparar palavras do extrato. */
+fun foldText(s: String): String = fold(s)
+
 private fun prettify(s: String): String {
     val t = s.trim()
     val letters = t.filter { it.isLetter() }

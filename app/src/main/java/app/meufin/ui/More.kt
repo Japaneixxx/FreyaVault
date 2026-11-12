@@ -35,6 +35,7 @@ fun MoreScreen(vm: AppViewModel) {
     var confirmWipe by remember { mutableStateOf(false) }
     var showRules by remember { mutableStateOf(false) }
     var showCats by remember { mutableStateOf(false) }
+    var showChangelog by remember { mutableStateOf(false) }
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -157,6 +158,9 @@ fun MoreScreen(vm: AppViewModel) {
             )
             Spacer(Modifier.height(8.dp))
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedButton(onClick = { showChangelog = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Novidades e histórico de versões (v${vm.currentVersion})")
+                }
                 OutlinedButton(
                     onClick = { vm.checkForUpdate() },
                     enabled = !vm.checkingUpdate && !vm.downloadingUpdate,
@@ -212,6 +216,9 @@ fun MoreScreen(vm: AppViewModel) {
             confirmButton = { TextButton(onClick = { vm.wipeLocalData(); confirmWipe = false }) { Text("Apagar") } },
             dismissButton = { TextButton(onClick = { confirmWipe = false }) { Text("Cancelar") } }
         )
+    }
+    if (showChangelog) {
+        ChangelogSheet(releaseNotes, "Novidades e versões", vm.currentVersion) { showChangelog = false }
     }
     if (showCats) {
         var newCat by remember { mutableStateOf("") }

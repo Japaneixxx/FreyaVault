@@ -83,6 +83,12 @@ confirmar a atualização. A instalação silenciosa não é permitida para apps
 use a mesma chave de assinatura das Releases anteriores. Essa verificação fica
 habilitada por padrão e pode ser desligada em **Mais > Segurança e avisos**.
 
+## v1.6.0
+- **Compromissos** (Planejar > Compromissos): contas **fixas** (internet), **variáveis** (luz, água) e **financiamentos** com parcelas definidas. Variáveis usam a média dos últimos pagamentos e pedem o valor real ao marcar como paga; financiamentos mostram parcela atual, quantas faltam, o que resta pagar e quando terminam. Baixa automática pelo extrato com uma palavra-chave (ex.: `enel`).
+- **Agenda** (Planejar > Agenda): receitas previstas (salário por dia fixo ou N-ésimo dia útil) e linha do tempo de 45 dias com o saldo previsto depois de cada item; avisa quando o saldo ficaria negativo. O Início mostra a agenda e a previsão de fim de mês.
+- **Novidades:** `ui/Changelog.kt` guarda o histórico. Ele abre pelo menu Mais e aparece sozinho na primeira abertura depois de atualizar (`Settings.lastSeenVersion`). **A cada versão nova, adicione a entrada no topo de `releaseNotes`.**
+- Banco migra de v4 para v5 sem perder dados; o backup inclui pagamentos e receitas.
+
 ## v1.5.0
 - **Nomes limpos no extrato:** o app remove o texto repetido do banco ("Compra no débito", "Transferência enviada pelo Pix", CPF mascarado, agência/conta) e mostra só o estabelecimento ou a pessoa, com sinalizações (💳 Débito, ⚡ Pix enviado, 🧾 Boleto, 🧩 parcela 3/10, 🔁 Débito automático...). A descrição original continua no detalhe e na busca (`data/Sanitizer.kt`). As regras de categoria passam a usar o nome limpo (regras antigas continuam valendo).
 - **Cobranças para revisar:** detecta cobranças duplicadas (mesmo nome e valor em até 3 dias) e assinaturas/contas fixas que ficaram mais caras. Aparece no Início, em Planejar > Cobranças e em notificação (se os alertas estiverem ligados).

@@ -29,13 +29,15 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 @Composable
-fun HomeScreen(vm: AppViewModel, goPlan: () -> Unit, goAlerts: () -> Unit) {
+fun HomeScreen(vm: AppViewModel, goPlan: () -> Unit, goAlerts: () -> Unit, goAgenda: () -> Unit) {
     val accounts by vm.accounts.collectAsState()
     val txs by vm.txs.collectAsState()
     val budgets by vm.budgets.collectAsState()
     val bills by vm.bills.collectAsState()
     val snaps by vm.snapshots.collectAsState()
     val envelopes by vm.envelopes.collectAsState()
+    val payments by vm.billPayments.collectAsState()
+    val incomes by vm.incomes.collectAsState()
     val alerts by vm.chargeAlerts.collectAsState()
     var month by rememberSaveable { mutableStateOf(monthKey()) }
     var adding by remember { mutableStateOf(false) }
@@ -77,9 +79,11 @@ fun HomeScreen(vm: AppViewModel, goPlan: () -> Unit, goAlerts: () -> Unit) {
             .sortedByDescending { it.second / it.third }.take(3)
     }
 
-    val up = remember(bills, accounts) { upcoming(bills, accounts) }
+    val agenda = remember(bank, bills, payments, incomes, accounts) { buildAgenda(bank, bills, payments, incomes, accounts) }
     val endOfMonth = YearMonth.now().atEndOfMonth()
-    val dueUntilEnd = up.filter { !it.date.isAfter(endOfMonth) }.sumOf { it.amount }
+    val monthEvents = agenda.filter { !it.date.isAfter(endOfMonth) }
+    val endBalance = monthEvents.lastOrNull()?.balanceAfter
+    val firstNegative = agenda.firstOrNull { it.balanceAfter < 0 }
     val trend = remember(snaps) { snaps.takeLast(60).map { it.bank } }
 
     LazyColumn(
@@ -105,12 +109,19 @@ fun HomeScreen(vm: AppViewModel, goPlan: () -> Unit, goAlerts: () -> Unit) {
                         "Cartões (fatura) ${money(cards)}  ·  atualizado ${ago(vm.lastSync)}",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                     )
-                    if (up.isNotEmpty() && dueUntilEnd > 0) {
+                    if (endBalance != null) {
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            "Previsto no fim do mês: ${money(bank - dueUntilEnd)}",
+                            "Previsto no fim do mês: ${money(endBalance)}",
                             style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                    if (firstNegative != null) {
+                        Text(
+                            "⚠️ Saldo previsto negativo em ${dayLabel(firstNegative.date.toString())}",
+                            style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.error
                         )
                     }
                     Spacer(Modifier.height(14.dp))
@@ -124,33 +135,38 @@ fun HomeScreen(vm: AppViewModel, goPlan: () -> Unit, goAlerts: () -> Unit) {
                 }
             }
         }
-        if (up.isNotEmpty()) item {
+        if (agenda.isNotEmpty()) item {
             NCard(Modifier.fillMaxWidth()) {
-                SectionTitle("Próximos vencimentos")
+                SectionTitle("Agenda")
                 Spacer(Modifier.height(6.dp))
-                up.take(4).forEach { u ->
-                    val days = ChronoUnit.DAYS.between(LocalDate.now(), u.date).toInt()
-                    val whenTxt = when {
-                        u.overdue -> "atrasada há ${-days} dia(s)"
-                        days == 0 -> "vence hoje"
-                        days == 1 -> "vence amanhã"
-                        else -> "vence em $days dias"
-                    }
+                agenda.take(4).forEach { e ->
+                    val days = ChronoUnit.DAYS.between(LocalDate.now(), e.date).toInt()
+                    val whenTxt = when { days <= 0 -> "hoje"; days == 1 -> "amanhã"; else -> "em $days dias" }
                     Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        CategoryAvatar(if (u.kind == "Cartão") "Pagamento de fatura" else "Moradia", 38.dp)
+                        Box(
+                            Modifier.size(38.dp).background(
+                                (if (e.amount > 0) IncomeColor else ExpenseColor).copy(alpha = 0.15f), CircleShape
+                            ),
+                            contentAlignment = Alignment.Center
+                        ) { Text(when (e.type) { "INCOME" -> "💰"; "CARD" -> "💳"; else -> "🧾" }) }
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
-                            Text(u.name, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(whenTxt, style = MaterialTheme.typography.bodySmall,
-                                color = if (u.overdue) ExpenseColor else MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(e.name, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                whenTxt + (e.note?.let { " · $it" } ?: ""), style = MaterialTheme.typography.bodySmall,
+                                color = if (e.note?.contains("atrasada") == true) ExpenseColor else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
-                        Text(money(u.amount), fontWeight = FontWeight.Medium)
+                        Text(
+                            (if (e.amount > 0) "+ " else "") + money(e.amount),
+                            color = if (e.amount > 0) IncomeColor else MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Medium
+                        )
                     }
                 }
-                TextButton(onClick = goPlan) { Text("Ver contas e cartões") }
+                TextButton(onClick = goAgenda) { Text("Ver agenda completa") }
             }
         }
-
         if (alerts.isNotEmpty()) item {
             NCard(Modifier.fillMaxWidth().clickable(onClick = goAlerts), container = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.55f)) {
                 SectionTitle("Atenção")
