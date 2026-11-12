@@ -23,7 +23,6 @@ data class ReleaseNote(
  */
 val releaseNotes: List<ReleaseNote> = listOf(
     ReleaseNote(
-<<<<<<< HEAD
         "1.8.0", "Simulador de investimentos",
         listOf(
             "Novo simulador na aba Patrimônio: informe valor inicial, aporte mensal, prazo e rentabilidade e veja quanto vai render.",
@@ -36,8 +35,6 @@ val releaseNotes: List<ReleaseNote> = listOf(
         codename = "Fimbulwinter"
     ),
     ReleaseNote(
-=======
->>>>>>> 2eee424a4ab0105c27cd1f804246c10d3dbb2c6b
         "1.7.0", "Fimbulwinter",
         listOf(
             "A versão atual fica visível no final da tela Mais.",

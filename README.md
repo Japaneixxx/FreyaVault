@@ -6,12 +6,8 @@ investimentos diretamente no aparelho.
 
 > **Privacidade:** não existe servidor próprio neste projeto. As credenciais, dados
 > locais e preferências ficam no dispositivo, em armazenamento criptografado. O app
-<<<<<<< HEAD
 > conversa diretamente com a API do Pluggy e, no simulador de investimentos, com a API
 > pública do Banco Central (CDI e IPCA), que não usa chave nem envia dados seus.
-=======
-> conversa diretamente com a API do Pluggy.
->>>>>>> 2eee424a4ab0105c27cd1f804246c10d3dbb2c6b
 
 ## Recursos
 
@@ -21,12 +17,9 @@ investimentos diretamente no aparelho.
 - Planejamento com orçamentos, modo envelope, metas, compromissos, financiamentos,
   receitas previstas e agenda de 45 dias.
 - Aba Patrimônio com investimentos do Pluggy, bens, dívidas e evolução do patrimônio.
-<<<<<<< HEAD
 - Simulador de investimentos na aba Patrimônio: juros compostos com aportes, rentabilidade em % a.a., % a.m.,
   % do CDI ou IPCA + taxa (CDI e IPCA digitados ou buscados na API pública do Banco Central), IR regressivo,
   meta reversa e comparação de cenários.
-=======
->>>>>>> 2eee424a4ab0105c27cd1f804246c10d3dbb2c6b
 - Alertas locais de orçamento, contas a pagar, faturas e saldo previsto.
 - Widget de saldo, tema claro/escuro/sistema e modo para ocultar valores.
 - Exportação CSV, resumo mensal compartilhável e backup/restauração em JSON.
