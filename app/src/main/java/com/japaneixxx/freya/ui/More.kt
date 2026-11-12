@@ -25,7 +25,9 @@ import androidx.fragment.app.FragmentActivity
 import com.japaneixxx.freya.Alerts
 import com.japaneixxx.freya.Biometric
 import com.japaneixxx.freya.R
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun MoreScreen(vm: AppViewModel) {
@@ -50,7 +52,11 @@ fun MoreScreen(vm: AppViewModel) {
         if (uri != null) scope.launch {
             runCatching {
                 val json = vm.backupJson()
-                ctx.contentResolver.openOutputStream(uri)?.use { it.write(json.toByteArray(Charsets.UTF_8)) }
+                withContext(Dispatchers.IO) {
+                    val output = ctx.contentResolver.openOutputStream(uri)
+                        ?: error("Não foi possível abrir o arquivo de backup")
+                    output.use { it.write(json.toByteArray(Charsets.UTF_8)) }
+                }
                 vm.message = "Backup salvo"
             }.onFailure { vm.message = "Não foi possível salvar o backup" }
         }
