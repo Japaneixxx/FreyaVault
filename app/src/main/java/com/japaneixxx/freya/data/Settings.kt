@@ -34,6 +34,9 @@ class Settings(ctx: Context) {
     var lockEnabled: Boolean get() = bool("lock"); set(v) = put("lock", v)
     val hasPin: Boolean get() = str("pin_hash").isNotBlank() && str("pin_salt").isNotBlank()
     var alertsEnabled: Boolean get() = bool("alerts"); set(v) = put("alerts", v)
+    var alertPromptShown: Boolean
+        get() = bool("alert_prompt_shown")
+        set(v) = put("alert_prompt_shown", v)
     var checkUpdatesOnOpen: Boolean
         get() = prefs.getBoolean("check_updates_on_open", true)
         set(v) = put("check_updates_on_open", v)

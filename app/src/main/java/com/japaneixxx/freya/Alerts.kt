@@ -44,6 +44,8 @@ object Alerts {
             true
         } catch (_: ActivityNotFoundException) {
             false
+        } catch (_: SecurityException) {
+            false
         }
     }
 

@@ -262,6 +262,12 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     }
 
     fun setAlerts(enabled: Boolean) {
+        if (enabled && !Alerts.notificationsEnabled(app)) {
+            settings.alertsEnabled = false
+            alertsEnabled = false
+            message = "Permita as notificações para ativar os alertas"
+            return
+        }
         settings.alertsEnabled = enabled
         alertsEnabled = enabled
         Alerts.schedule(app, enabled)

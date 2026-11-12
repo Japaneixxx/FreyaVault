@@ -75,9 +75,7 @@ fun MoreScreen(vm: AppViewModel) {
         } else {
             vm.setAlerts(false)
             vm.message = "Permissão de notificações negada"
-            if (!Alerts.openNotificationSettings(ctx)) {
-                vm.message = "Não foi possível abrir as configurações de notificações"
-            }
+            Alerts.openNotificationSettings(ctx)
         }
     }
 
@@ -130,16 +128,13 @@ fun MoreScreen(vm: AppViewModel) {
                 if (!on) vm.setAlerts(false)
                 else if (Build.VERSION.SDK_INT >= 33 && !Alerts.canNotify(ctx)) {
                     runCatching { notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS) }
-                        .onFailure { error ->
-                            if (error is IllegalStateException || error is SecurityException) {
-                                vm.message = "Não foi possível solicitar a permissão de notificações"
-                            } else {
-                                throw error
-                            }
+                        .onFailure {
+                            vm.message = "Não foi possível solicitar a permissão de notificações"
+                            Alerts.openNotificationSettings(ctx)
                         }
                 }
-                else if (!Alerts.notificationsEnabled(ctx) && !Alerts.openNotificationSettings(ctx)) {
-                    vm.message = "Não foi possível abrir as configurações de notificações"
+                else if (!Alerts.notificationsEnabled(ctx)) {
+                    if (!Alerts.openNotificationSettings(ctx)) vm.message = "Não foi possível abrir as configurações de notificações"
                 }
                 else vm.setAlerts(true)
             }

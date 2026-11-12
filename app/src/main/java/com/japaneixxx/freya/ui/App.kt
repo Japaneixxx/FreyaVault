@@ -12,7 +12,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun App(vm: AppViewModel, onUnlock: () -> Unit, onInstallUpdate: (android.net.Uri) -> Unit) {
+fun App(
+    vm: AppViewModel,
+    onUnlock: () -> Unit,
+    onInstallUpdate: (android.net.Uri) -> Unit,
+    onEnableAlerts: () -> Unit
+) {
     if (!vm.configured) {
         SetupScreen(vm)
         return
@@ -32,6 +37,7 @@ fun App(vm: AppViewModel, onUnlock: () -> Unit, onInstallUpdate: (android.net.Ur
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var tabHistory by rememberSaveable { mutableStateOf(listOf<Int>()) }
     val snack = remember { SnackbarHostState() }
+    var showAlertPrompt by remember { mutableStateOf(!vm.settings.alertPromptShown) }
     fun navigateTo(newTab: Int) {
         if (newTab == tab) return
         tabHistory = tabHistory + tab
@@ -68,6 +74,29 @@ fun App(vm: AppViewModel, onUnlock: () -> Unit, onInstallUpdate: (android.net.Ur
 
     vm.whatsNewFrom?.let { from ->
         ChangelogSheet(notesSince(from, vm.currentVersion), "Novidades do Freya", vm.currentVersion) { vm.dismissWhatsNew() }
+    }
+    if (showAlertPrompt) {
+        AlertDialog(
+            onDismissRequest = {
+                vm.settings.alertPromptShown = true
+                showAlertPrompt = false
+            },
+            title = { Text("Ativar alertas?") },
+            text = { Text("O Freya pode avisar sobre contas, faturas e orçamentos próximos do limite.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    vm.settings.alertPromptShown = true
+                    showAlertPrompt = false
+                    onEnableAlerts()
+                }) { Text("Ativar") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    vm.settings.alertPromptShown = true
+                    showAlertPrompt = false
+                }) { Text("Agora não") }
+            }
+        )
     }
 
     CompositionLocalProvider(

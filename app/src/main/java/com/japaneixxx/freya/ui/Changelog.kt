@@ -23,6 +23,15 @@ data class ReleaseNote(
  */
 val releaseNotes: List<ReleaseNote> = listOf(
     ReleaseNote(
+        "1.8.4", "Alertas com permissão segura",
+        listOf(
+            "Na primeira abertura, escolha se deseja ativar alertas de contas, faturas e orçamentos.",
+            "Ao ativar os alertas, o Freya solicita a permissão de notificações ou abre as configurações quando ela está bloqueada.",
+            "Recusas ou falhas de permissão não causam mais crash no aplicativo."
+        ),
+        codename = "Fimbulwinter"
+    ),
+    ReleaseNote(
         "1.8.3", "Recebimentos avulsos e calendário",
         listOf(
             "Cadastre entradas que acontecerão uma única vez, como o pagamento de um freelance.",
