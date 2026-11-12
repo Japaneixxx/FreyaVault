@@ -8,6 +8,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.meufin.Alerts
 import app.meufin.BalanceWidget
+import app.meufin.Biometric
 import app.meufin.data.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
