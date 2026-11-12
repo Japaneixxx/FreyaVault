@@ -16,6 +16,8 @@ investimentos diretamente no aparelho.
 - Categorias personalizadas e regras aprendidas a partir das alterações do usuário.
 - Planejamento com orçamentos, modo envelope, metas, compromissos, financiamentos,
   receitas previstas e agenda de 45 dias.
+- Contas e cartões podem ser renomeados dentro do app (Mais > Contas ou Planejar > Cartões); o nome do banco
+  não muda e o apelido sobrevive às sincronizações e entra no backup.
 - Aba Patrimônio com investimentos do Pluggy, bens, dívidas e evolução do patrimônio.
 - Simulador de investimentos na aba Patrimônio: juros compostos com aportes, rentabilidade em % a.a., % a.m.,
   % do CDI ou IPCA + taxa (CDI e IPCA digitados ou buscados na API pública do Banco Central), IR regressivo,
@@ -102,7 +104,7 @@ arquivo de backup em local seguro.
 - A opção fica em **Mais > Segurança e avisos** e vem ativada por padrão.
 
 O histórico de versões fica em
-`app/src/main/java/app/meufin/ui/Changelog.kt`. Cada nova versão deve entrar no
+`app/src/main/java/com/japaneixxx/freya/ui/Changelog.kt`. Cada nova versão deve entrar no
 topo de `releaseNotes`, com a mesma versão definida em `app/build.gradle.kts`.
 As versões `1.x` atuais usam o codinome **Fimbulwinter**.
 
@@ -140,9 +142,10 @@ Perder o keystore de release impede atualizações sobre instalações existente
 ## Estrutura principal
 
 ```text
-app/src/main/java/app/meufin/
+app/src/main/java/com/japaneixxx/freya/
 ├── data/   persistência, Room, Pluggy, configurações e backup
 └── ui/     telas Compose, ViewModels, tema e changelog
 ```
 
-O namespace e o application ID são `app.meufin`.
+O namespace e o application ID são `com.japaneixxx.freya`. Esta mudança inaugura um novo identificador
+do aplicativo Android; instalações da versão anterior precisam ser migradas por backup e restauração.

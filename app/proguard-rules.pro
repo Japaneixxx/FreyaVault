@@ -1,1 +1,1 @@
--keep class app.meufin.data.** { *; }
+-keep class com.japaneixxx.freya.data.** { *; }

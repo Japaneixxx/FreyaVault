@@ -3,13 +3,14 @@
 ## Contexto
 
 - Projeto Android em Kotlin com Jetpack Compose, Room e KSP.
-- O namespace e o application ID são `app.meufin`.
+- O app se chama **Freya** e o desenvolvedor é **Japaneixxx**; o repositório de releases é `Japaneixxx/FreyaVault`.
+- O namespace e o application ID são `com.japaneixxx.freya`.
 - O app é local e consulta diretamente a API do Pluggy; não crie um servidor próprio sem solicitação explícita.
 
 ## Estrutura
 
-- `app/src/main/java/app/meufin/data/`: persistência, configurações, categorização, integração Pluggy e backup.
-- `app/src/main/java/app/meufin/ui/`: telas Compose, ViewModels, tema e formatação.
+- `app/src/main/java/com/japaneixxx/freya/data/`: persistência, configurações, categorização, integração Pluggy e backup.
+- `app/src/main/java/com/japaneixxx/freya/ui/`: telas Compose, ViewModels, tema e formatação.
 - `app/src/main/res/`: recursos Android.
 - `.github/workflows/build.yml`: build e publicação automática do APK.
 
@@ -27,7 +28,7 @@
 - Sempre que alterar o app ou preparar uma nova entrega, lembre explicitamente o agente de atualizar a versão antes de finalizar.
 - Antes de concluir qualquer mudança que será publicada, incremente `versionCode` e atualize `versionName` no formato `Major.Minor.Bug` (por exemplo, `1.2.0`).
 - Atualize `versionCode` e `versionName` em `app/build.gradle.kts` juntos; o `versionCode` deve sempre aumentar.
-- Ao subir a versão, adicione também a entrada correspondente no topo de `releaseNotes` em `app/src/main/java/app/meufin/ui/Changelog.kt`; ela alimenta o menu "Novidades" e o aviso automático após atualizar.
+- Ao subir a versão, adicione também a entrada correspondente no topo de `releaseNotes` em `app/src/main/java/com/japaneixxx/freya/ui/Changelog.kt`; ela alimenta o menu "Novidades" e o aviso automático após atualizar.
 - O workflow valida `versionName` e publica a Release com a tag `v<Major>.<Minor>.<Bug>`.
 - Use `push` para `main` ou `master` somente quando quiser disparar a publicação automática do APK.
 - Releases devem usar o keystore permanente configurado pelos secrets do GitHub; nunca crie ou versione chaves de assinatura no repositório.
