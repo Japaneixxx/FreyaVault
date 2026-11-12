@@ -8,6 +8,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.meufin.Alerts
 import app.meufin.BalanceWidget
+import app.meufin.Biometric
 import app.meufin.data.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
@@ -101,6 +102,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
 
     var locked by mutableStateOf(settings.lockEnabled)
     var lockEnabled by mutableStateOf(settings.lockEnabled)
+    var pinEnabled by mutableStateOf(settings.hasPin)
     var alertsEnabled by mutableStateOf(settings.alertsEnabled)
     var checkUpdatesOnOpen by mutableStateOf(settings.checkUpdatesOnOpen)
     var themeMode by mutableStateOf(settings.themeMode)
@@ -222,6 +224,23 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
         settings.lockEnabled = enabled
         lockEnabled = enabled
         BalanceWidget.refresh(app)
+    }
+
+    fun setPin(pin: String) {
+        settings.setPin(pin)
+        pinEnabled = true
+    }
+
+    fun clearPin() {
+        settings.clearPin()
+        pinEnabled = false
+        if (!Biometric.available(app) && lockEnabled) setLock(false)
+    }
+
+    fun unlockWithPin(pin: String): Boolean {
+        if (!settings.verifyPin(pin)) return false
+        locked = false
+        return true
     }
 
     fun setAlerts(enabled: Boolean) {

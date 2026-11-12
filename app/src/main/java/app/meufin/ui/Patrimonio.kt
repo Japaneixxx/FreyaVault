@@ -6,6 +6,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -23,6 +24,11 @@ import kotlin.math.roundToInt
 
 @Composable
 fun NetWorthScreen(vm: AppViewModel) {
+    var showCalc by rememberSaveable { mutableStateOf(false) }
+    if (showCalc) {
+        InvestCalcScreen(vm) { showCalc = false }
+        return
+    }
     val accounts by vm.accounts.collectAsState()
     val investments by vm.investments.collectAsState()
     val netItems by vm.netItems.collectAsState()
@@ -129,6 +135,8 @@ fun NetWorthScreen(vm: AppViewModel) {
                         DonutChart(byType.map { (t, l) -> t to l.sumOf { it.balance } }, centerLabel = "Investido")
                     }
                 }
+                Spacer(Modifier.height(12.dp))
+                OutlinedButton(onClick = { showCalc = true }, modifier = Modifier.fillMaxWidth()) { Text("Simular investimento") }
             }
         }
         byType.forEach { (type, list) ->

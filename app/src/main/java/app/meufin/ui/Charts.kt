@@ -125,3 +125,16 @@ fun TrendChart(values: List<Double>, modifier: Modifier = Modifier) {
         drawPath(path, color, style = Stroke(5f, cap = StrokeCap.Round, join = StrokeJoin.Round))
     }
 }
+
+/** Evolução de uma simulação de investimento: o que foi aportado (suave) contra o valor líquido (forte). */
+@Composable
+fun GrowthChart(invested: List<Double>, net: List<Double>, modifier: Modifier = Modifier) {
+    if (net.size < 2) return
+    val maxV = maxOf(invested.maxOrNull() ?: 0.0, net.maxOrNull() ?: 0.0).toFloat().coerceAtLeast(1f)
+    val c1 = MaterialTheme.colorScheme.primary
+    val c2 = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
+    Canvas(modifier.fillMaxWidth().height(140.dp)) {
+        line(invested.map { it.toFloat() }, maxV, invested.size, c2, 4f)
+        line(net.map { it.toFloat() }, maxV, net.size, c1, 6f)
+    }
+}

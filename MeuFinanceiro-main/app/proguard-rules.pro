@@ -1,1 +1,0 @@
--keep class app.meufin.data.** { *; }

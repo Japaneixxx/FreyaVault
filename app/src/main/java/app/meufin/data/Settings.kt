@@ -1,8 +1,11 @@
 package app.meufin.data
 
 import android.content.Context
+import android.util.Base64
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import java.security.MessageDigest
+import java.security.SecureRandom
 
 /** Credenciais e preferências ficam criptografadas (Android Keystore) no próprio aparelho. */
 class Settings(ctx: Context) {
@@ -29,6 +32,7 @@ class Settings(ctx: Context) {
 
     var hideValues: Boolean get() = bool("hide"); set(v) = put("hide", v)
     var lockEnabled: Boolean get() = bool("lock"); set(v) = put("lock", v)
+    val hasPin: Boolean get() = str("pin_hash").isNotBlank() && str("pin_salt").isNotBlank()
     var alertsEnabled: Boolean get() = bool("alerts"); set(v) = put("alerts", v)
     var checkUpdatesOnOpen: Boolean
         get() = prefs.getBoolean("check_updates_on_open", true)
@@ -42,8 +46,38 @@ class Settings(ctx: Context) {
     /** Última versão cujo "o que há de novo" o usuário já viu. */
     var lastSeenVersion: String get() = str("last_seen_version"); set(v) = put("last_seen_version", v)
 
+    // Taxas de mercado da calculadora de investimentos (última consulta ao Banco Central ou valor digitado).
+    var calcCdi: String get() = str("calc_cdi"); set(v) = put("calc_cdi", v)
+    var calcIpca: String get() = str("calc_ipca"); set(v) = put("calc_ipca", v)
+    var calcRatesDate: String get() = str("calc_rates_date"); set(v) = put("calc_rates_date", v)
+    var calcRatesFetchedAt: Long
+        get() = prefs.getLong("calc_rates_fetched_at", 0L)
+        set(v) { prefs.edit().putLong("calc_rates_fetched_at", v).apply() }
+
     /** Categorias criadas pelo usuário, separadas por "|". */
     var customCategories: String get() = str("custom_cats"); set(v) = put("custom_cats", v)
+
+    fun setPin(pin: String) {
+        val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
+        put("pin_salt", Base64.encodeToString(salt, Base64.NO_WRAP))
+        put("pin_hash", hashPin(pin, salt))
+    }
+
+    fun clearPin() {
+        prefs.edit().remove("pin_hash").remove("pin_salt").apply()
+    }
+
+    fun verifyPin(pin: String): Boolean {
+        val salt = runCatching { Base64.decode(str("pin_salt"), Base64.NO_WRAP) }.getOrNull() ?: return false
+        val expected = str("pin_hash")
+        if (expected.isBlank()) return false
+        return MessageDigest.isEqual(hashPin(pin, salt).toByteArray(), expected.toByteArray())
+    }
+
+    private fun hashPin(pin: String, salt: ByteArray): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        return Base64.encodeToString(digest.digest(salt + pin.toByteArray(Charsets.UTF_8)), Base64.NO_WRAP)
+    }
 
     // usados pelo widget
     var widgetBank: Double
