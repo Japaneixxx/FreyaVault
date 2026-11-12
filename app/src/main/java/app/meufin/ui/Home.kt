@@ -151,6 +151,7 @@ fun HomeScreen(vm: AppViewModel, goPlan: () -> Unit, goAlerts: () -> Unit) {
             }
         }
 
+<<<<<<< HEAD
         if (alerts.isNotEmpty()) item {
             NCard(Modifier.fillMaxWidth().clickable(onClick = goAlerts), container = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.55f)) {
                 SectionTitle("Atenção")
@@ -170,6 +171,8 @@ fun HomeScreen(vm: AppViewModel, goPlan: () -> Unit, goAlerts: () -> Unit) {
             }
         }
 
+=======
+>>>>>>> ca3862f5ab875d29627bcebfbf222fb3e17f0ba8
         // ---------- mês ----------
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {

@@ -79,9 +79,14 @@ fun App(vm: AppViewModel, onUnlock: () -> Unit, onInstallUpdate: (android.net.Ur
                     val colors = NavigationBarItemDefaults.colors(indicatorColor = MaterialTheme.colorScheme.primaryContainer)
                     NavigationBarItem(tab == 0, { navigateTo(0) }, { Icon(Icons.Default.Home, null) }, label = { Text("Início") }, colors = colors)
                     NavigationBarItem(tab == 1, { navigateTo(1) }, { Icon(Icons.Default.List, null) }, label = { Text("Extrato") }, colors = colors)
+<<<<<<< HEAD
                     NavigationBarItem(tab == 2, { navigateTo(2) }, { Icon(Icons.Default.AccountBox, null) }, label = { Text("Patrimônio") }, colors = colors)
                     NavigationBarItem(tab == 3, { navigateTo(3) }, { Icon(Icons.Default.CheckCircle, null) }, label = { Text("Planejar") }, colors = colors)
                     NavigationBarItem(tab == 4, { navigateTo(4) }, { Icon(Icons.Default.Menu, null) }, label = { Text("Mais") }, colors = colors)
+=======
+                    NavigationBarItem(tab == 2, { navigateTo(2) }, { Icon(Icons.Default.CheckCircle, null) }, label = { Text("Planejar") }, colors = colors)
+                    NavigationBarItem(tab == 3, { navigateTo(3) }, { Icon(Icons.Default.Menu, null) }, label = { Text("Mais") }, colors = colors)
+>>>>>>> ca3862f5ab875d29627bcebfbf222fb3e17f0ba8
                 }
             }
         }
@@ -89,11 +94,15 @@ fun App(vm: AppViewModel, onUnlock: () -> Unit, onInstallUpdate: (android.net.Ur
         Column(Modifier.padding(pad).fillMaxSize()) {
             if (vm.syncing) LinearProgressIndicator(Modifier.fillMaxWidth())
             when (tab) {
+<<<<<<< HEAD
                 0 -> HomeScreen(
                     vm,
                     goPlan = { navigateTo(3) },
                     goAlerts = { planSection = 6; navigateTo(3) }
                 )
+=======
+                0 -> HomeScreen(vm, goPlan = { navigateTo(2) })
+>>>>>>> ca3862f5ab875d29627bcebfbf222fb3e17f0ba8
                 1 -> ExtratoScreen(vm)
                 2 -> NetWorthScreen(vm)
                 3 -> PlanScreen(vm, planSection) { planSection = it }

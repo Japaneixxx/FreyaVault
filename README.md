@@ -77,12 +77,17 @@ Pluggy (se vier) -> palavras-chave locais (Categorizer.kt) -> regra aprendida ao
 - Insight do dia da semana com maior gasto.
 
 ## Atualizações
+<<<<<<< HEAD
 Ao abrir o app, ele consulta a Release mais recente do repositório **Japaneixxx/FreyaVault** (`Updater.kt`). Se o repositório ainda não tiver Release, nada é exibido. Quando houver
+=======
+Ao abrir o app, ele consulta a Release mais recente deste repositório. Quando houver
+>>>>>>> ca3862f5ab875d29627bcebfbf222fb3e17f0ba8
 um APK novo, o app oferece o download e abre o instalador oficial do Android para
 confirmar a atualização. A instalação silenciosa não é permitida para apps comuns;
 use a mesma chave de assinatura das Releases anteriores. Essa verificação fica
 habilitada por padrão e pode ser desligada em **Mais > Segurança e avisos**.
 
+<<<<<<< HEAD
 ## v1.5.0
 - **Nomes limpos no extrato:** o app remove o texto repetido do banco ("Compra no débito", "Transferência enviada pelo Pix", CPF mascarado, agência/conta) e mostra só o estabelecimento ou a pessoa, com sinalizações (💳 Débito, ⚡ Pix enviado, 🧾 Boleto, 🧩 parcela 3/10, 🔁 Débito automático...). A descrição original continua no detalhe e na busca (`data/Sanitizer.kt`). As regras de categoria passam a usar o nome limpo (regras antigas continuam valendo).
 - **Cobranças para revisar:** detecta cobranças duplicadas (mesmo nome e valor em até 3 dias) e assinaturas/contas fixas que ficaram mais caras. Aparece no Início, em Planejar > Cobranças e em notificação (se os alertas estiverem ligados).
@@ -92,3 +97,5 @@ habilitada por padrão e pode ser desligada em **Mais > Segurança e avisos**.
 - **Tutorial de conexão** refeito: passos com links, ajuda para erros comuns e teste da conexão antes de salvar.
 - Banco migra de v3 para v4 sem perder dados. Backup agora inclui bens, dívidas e envelopes.
 
+=======
+>>>>>>> ca3862f5ab875d29627bcebfbf222fb3e17f0ba8

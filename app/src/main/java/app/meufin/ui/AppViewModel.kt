@@ -20,7 +20,10 @@ import java.net.UnknownHostException
 import java.util.Locale
 import java.util.UUID
 import android.net.Uri
+<<<<<<< HEAD
 import kotlinx.coroutines.flow.MutableStateFlow
+=======
+>>>>>>> ca3862f5ab875d29627bcebfbf222fb3e17f0ba8
 
 data class TxItem(
     val tx: Tx,
@@ -162,7 +165,11 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
                     message = "Você já está usando a versão mais recente"
                 }
             } catch (e: Exception) {
+<<<<<<< HEAD
                 if (showNoUpdate) message = e.message ?: "Não foi possível verificar atualizações"
+=======
+                message = e.message ?: "Não foi possível verificar atualizações"
+>>>>>>> ca3862f5ab875d29627bcebfbf222fb3e17f0ba8
             } finally {
                 checkingUpdate = false
             }

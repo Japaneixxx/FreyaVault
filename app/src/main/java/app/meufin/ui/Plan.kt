@@ -129,7 +129,10 @@ private fun BudgetDialog(
     existing: Budget?, isEnvelope: Boolean, onDismiss: () -> Unit,
     onSave: (String, Double, Boolean) -> Unit, onDelete: (() -> Unit)?
 ) {
+<<<<<<< HEAD
     var envelope by remember { mutableStateOf(isEnvelope) }
+=======
+>>>>>>> ca3862f5ab875d29627bcebfbf222fb3e17f0ba8
     var cat by remember { mutableStateOf(existing?.category ?: Cats.budget.first()) }
     var value by remember { mutableStateOf(existing?.limitAmount?.roundToInt()?.toString() ?: "") }
     val amount = parseAmount(value)
