@@ -23,6 +23,14 @@ data class ReleaseNote(
  */
 val releaseNotes: List<ReleaseNote> = listOf(
     ReleaseNote(
+        "1.8.5", "Correção do calendário avulso",
+        listOf(
+            "Corrigido o toque no campo de data do recebimento avulso para abrir o calendário normalmente.",
+            "A seleção da data volta a funcionar ao criar ou editar uma entrada avulsa."
+        ),
+        codename = "Fimbulwinter"
+    ),
+    ReleaseNote(
         "1.8.4", "Alertas com permissão segura",
         listOf(
             "Na primeira abertura, escolha se deseja ativar alertas de contas, faturas e orçamentos.",
