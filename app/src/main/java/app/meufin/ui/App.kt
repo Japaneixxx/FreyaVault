@@ -18,7 +18,7 @@ fun App(vm: AppViewModel, onUnlock: () -> Unit, onInstallUpdate: (android.net.Ur
         return
     }
     if (vm.locked) {
-        LockScreen(onUnlock)
+        LockScreen(vm.pinEnabled, onUnlock) { vm.unlockWithPin(it) }
         return
     }
 
@@ -110,7 +110,9 @@ fun App(vm: AppViewModel, onUnlock: () -> Unit, onInstallUpdate: (android.net.Ur
 }
 
 @Composable
-private fun LockScreen(onUnlock: () -> Unit) {
+private fun LockScreen(hasPin: Boolean, onUnlock: () -> Unit, onPinUnlock: (String) -> Boolean) {
+    var pin by rememberSaveable { mutableStateOf("") }
+    var pinError by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) { onUnlock() }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
@@ -124,6 +126,31 @@ private fun LockScreen(onUnlock: () -> Unit) {
             Text("Bloqueado", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(24.dp))
             Button(onClick = onUnlock) { Text("Desbloquear") }
+            if (hasPin) {
+                Spacer(Modifier.height(20.dp))
+                OutlinedTextField(
+                    value = pin,
+                    onValueChange = {
+                        pin = it.filter(Char::isDigit).take(4)
+                        pinError = false
+                    },
+                    label = { Text("PIN de 4 dígitos") },
+                    singleLine = true,
+                    isError = pinError,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword
+                    ),
+                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
+                )
+                if (pinError) {
+                    Text("PIN incorreto", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+                Spacer(Modifier.height(8.dp))
+                Button(
+                    onClick = { pinError = !onPinUnlock(pin) },
+                    enabled = pin.length == 4
+                ) { Text("Entrar com PIN") }
+            }
         }
     }
 }

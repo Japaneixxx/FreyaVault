@@ -10,13 +10,27 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 /** Uma versão do app e o que mudou nela, em linguagem de quem usa. */
-data class ReleaseNote(val version: String, val title: String, val items: List<String>)
+data class ReleaseNote(
+    val version: String,
+    val title: String,
+    val items: List<String>,
+    val codename: String? = null
+)
 
 /**
  * Histórico de versões, da mais nova para a mais antiga.
  * Ao publicar uma versão nova, adicione a entrada dela no TOPO desta lista (a mesma do `versionName`).
  */
 val releaseNotes: List<ReleaseNote> = listOf(
+    ReleaseNote(
+        "1.7.0", "Fimbulwinter",
+        listOf(
+            "A versão atual fica visível no final da tela Mais.",
+            "As versões podem ter um codinome personalizado, como Fimbulwinter ou Ragnarok.",
+            "Configure um PIN próprio de 4 dígitos para desbloquear o app junto da biometria."
+        ),
+        codename = "Fimbulwinter"
+    ),
     ReleaseNote(
         "1.6.0", "Compromissos e previsão de salário",
         listOf(
@@ -28,7 +42,8 @@ val releaseNotes: List<ReleaseNote> = listOf(
             "Agenda: linha do tempo dos próximos 45 dias com entradas, contas e faturas, e o saldo previsto depois de cada uma. O app avisa se o saldo vai ficar negativo.",
             "Alerta no dia do salário previsto e previsão de saldo no fim do mês no Início.",
             "Novidades: este histórico de versões no menu Mais e um resumo automático na primeira abertura depois de atualizar."
-        )
+        ),
+        codename = "Fimbulwinter"
     ),
     ReleaseNote(
         "1.5.0", "Nomes limpos, patrimônio e envelopes",
@@ -39,14 +54,16 @@ val releaseNotes: List<ReleaseNote> = listOf(
             "Orçamentos em modo envelope: a sobra de cada mês passa para o seguinte.",
             "Seletor de categorias em grade, com busca, mais usadas e criação na hora.",
             "Tutorial de conexão com o Pluggy refeito, com teste da conexão antes de salvar."
-        )
+        ),
+        codename = "Fimbulwinter"
     ),
     ReleaseNote(
         "1.4.0", "Atualização pelo próprio app",
         listOf(
             "O app verifica novas versões e instala a atualização por conta própria.",
             "Ajustes nas notificações e no botão voltar entre as abas."
-        )
+        ),
+        codename = "Fimbulwinter"
     ),
     ReleaseNote(
         "1.3.0", "Redesign nórdico",
@@ -54,7 +71,8 @@ val releaseNotes: List<ReleaseNote> = listOf(
             "Novo visual em todo o app, claro e escuro, com montanhas no topo do Início.",
             "Extrato reformulado: cartões por dia, filtros em chips, seleção em lote e detalhe em painel.",
             "Calendário de gastos, carrossel de insights e categorias personalizadas."
-        )
+        ),
+        codename = "Fimbulwinter"
     ),
     ReleaseNote(
         "1.2.0", "Segurança, alertas e widget",
@@ -62,25 +80,31 @@ val releaseNotes: List<ReleaseNote> = listOf(
             "Bloqueio por biometria ou PIN e modo para ocultar valores.",
             "Alertas de orçamento, contas a vencer e faturas de cartão.",
             "Widget de saldo, contas a pagar, cartões, parcelas detectadas e backup em JSON."
-        )
+        ),
+        codename = "Fimbulwinter"
     ),
     ReleaseNote(
         "1.1.0", "Planejamento",
         listOf(
             "Orçamentos por categoria, metas de poupança e cobranças recorrentes.",
             "Lançamentos manuais, insights automáticos e exportação em CSV."
-        )
+        ),
+        codename = "Fimbulwinter"
     ),
     ReleaseNote(
         "1.0.0", "Primeira versão",
         listOf(
             "Sincronização direta com o Pluggy (Meu Pluggy), sem servidor.",
             "Resumo do mês, extrato e categorias automáticas."
-        )
+        ),
+        codename = "Fimbulwinter"
     )
 )
 
 private fun versionParts(v: String): List<Int> = v.trim().removePrefix("v").split('.').map { it.toIntOrNull() ?: 0 }
+
+fun releaseLabel(note: ReleaseNote): String =
+    "v${note.version}${note.codename?.takeIf { it.isNotBlank() }?.let { " $it" } ?: ""}"
 
 /** true se [a] é uma versão mais nova que [b]. */
 fun isNewerVersion(a: String, b: String): Boolean {
@@ -114,7 +138,9 @@ fun ChangelogSheet(notes: List<ReleaseNote>, title: String, currentVersion: Stri
         Column(Modifier.padding(horizontal = 24.dp).padding(bottom = 24.dp)) {
             Text(title, style = MaterialTheme.typography.headlineSmall)
             Text(
-                "Você está na versão $currentVersion",
+                "Você está na versão ${
+                    notes.firstOrNull { it.version == currentVersion }?.let(::releaseLabel) ?: "v$currentVersion"
+                }",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(12.dp))
@@ -122,7 +148,7 @@ fun ChangelogSheet(notes: List<ReleaseNote>, title: String, currentVersion: Stri
                 items(notes, key = { it.version }) { n ->
                     NCard(Modifier.fillMaxWidth(), padding = 16.dp) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("v${n.version}", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                            Text(releaseLabel(n), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
                             if (n.version == currentVersion) {
                                 Spacer(Modifier.width(8.dp))
                                 Pill("instalada")

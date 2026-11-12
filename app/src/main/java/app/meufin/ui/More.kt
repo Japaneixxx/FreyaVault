@@ -36,6 +36,7 @@ fun MoreScreen(vm: AppViewModel) {
     var showRules by remember { mutableStateOf(false) }
     var showCats by remember { mutableStateOf(false) }
     var showChangelog by remember { mutableStateOf(false) }
+    var showPinDialog by remember { mutableStateOf(false) }
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -103,14 +104,18 @@ fun MoreScreen(vm: AppViewModel) {
 
         SectionTitle("Segurança e avisos")
         NCard(Modifier.fillMaxWidth()) {
-            SwitchRow("Bloquear com biometria", "Pede digital, rosto ou PIN ao abrir.", vm.lockEnabled) { on ->
+            SwitchRow("Bloquear com biometria ou PIN", "Pede biometria ou o PIN de 4 dígitos ao abrir.", vm.lockEnabled) { on ->
                 if (!on) vm.setLock(false)
-                else if (!Biometric.available(ctx)) vm.message = "Configure biometria ou bloqueio de tela no Android primeiro"
+                else if (!vm.pinEnabled && !Biometric.available(ctx)) vm.message = "Configure um PIN ou a biometria do aparelho primeiro"
                 else {
                     val act = ctx as? FragmentActivity
-                    if (act == null) vm.setLock(true)
+                    if (vm.pinEnabled || act == null) vm.setLock(true)
                     else Biometric.prompt(act, onSuccess = { vm.setLock(true) })
                 }
+            }
+            Spacer(Modifier.height(10.dp))
+            OutlinedButton(onClick = { showPinDialog = true }, modifier = Modifier.fillMaxWidth()) {
+                Text(if (vm.pinEnabled) "Alterar PIN de 4 dígitos" else "Configurar PIN de 4 dígitos")
             }
             Spacer(Modifier.height(10.dp))
             SwitchRow("Alertas", "Avisa quando um orçamento chega a 80%/100%, e antes do vencimento de contas e faturas.", vm.alertsEnabled) { on ->
@@ -206,6 +211,14 @@ fun MoreScreen(vm: AppViewModel) {
 
         SectionTitle("Credenciais Pluggy")
         NCard(Modifier.fillMaxWidth()) { CredentialsForm(vm, "Salvar e sincronizar") }
+
+        val currentRelease = releaseNotes.firstOrNull { it.version == vm.currentVersion }
+        Text(
+            "Versão atual: ${currentRelease?.let(::releaseLabel) ?: "v${vm.currentVersion}"}",
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 
     if (confirmWipe) {
@@ -219,6 +232,58 @@ fun MoreScreen(vm: AppViewModel) {
     }
     if (showChangelog) {
         ChangelogSheet(releaseNotes, "Novidades e versões", vm.currentVersion) { showChangelog = false }
+    }
+    if (showPinDialog) {
+        var pin by remember { mutableStateOf("") }
+        var confirmation by remember { mutableStateOf("") }
+        var error by remember { mutableStateOf<String?>(null) }
+        AlertDialog(
+            onDismissRequest = { showPinDialog = false },
+            title = { Text(if (vm.pinEnabled) "Alterar PIN" else "Configurar PIN") },
+            confirmButton = {
+                TextButton(
+                    enabled = pin.length == 4 && confirmation.length == 4,
+                    onClick = {
+                        if (pin != confirmation) error = "Os PINs não conferem"
+                        else {
+                            vm.setPin(pin)
+                            showPinDialog = false
+                        }
+                    }
+                ) { Text("Salvar") }
+            },
+            dismissButton = {
+                Row {
+                    if (vm.pinEnabled) {
+                        TextButton(onClick = { vm.clearPin(); showPinDialog = false }) { Text("Remover PIN") }
+                    }
+                    TextButton(onClick = { showPinDialog = false }) { Text("Cancelar") }
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Use exatamente 4 dígitos. O PIN é armazenado com proteção no aparelho.")
+                    OutlinedTextField(
+                        value = pin,
+                        onValueChange = { pin = it.filter(Char::isDigit).take(4) },
+                        label = { Text("PIN") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        visualTransformation = PasswordVisualTransformation()
+                    )
+                    OutlinedTextField(
+                        value = confirmation,
+                        onValueChange = { confirmation = it.filter(Char::isDigit).take(4) },
+                        label = { Text("Confirmar PIN") },
+                        singleLine = true,
+                        isError = error != null,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        visualTransformation = PasswordVisualTransformation()
+                    )
+                    error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+                }
+            }
+        )
     }
     if (showCats) {
         var newCat by remember { mutableStateOf("") }
