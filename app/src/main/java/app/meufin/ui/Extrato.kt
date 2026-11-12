@@ -128,11 +128,7 @@ fun ExtratoScreen(vm: AppViewModel) {
                 item { FilterChip(selected = type == 1, onClick = { type = if (type == 1) 0 else 1 }, label = { Text("Receitas") }) }
                 item { FilterChip(selected = type == 2, onClick = { type = if (type == 2) 0 else 2 }, label = { Text("Despesas") }) }
                 item {
-<<<<<<< HEAD
                     CategoryFilterChip(category ?: "Categoria", category != null, listOf("Todas") + Cats.all) {
-=======
-                    ChipPicker(category ?: "Categoria", category != null, listOf("Todas") + Cats.all) {
->>>>>>> ca3862f5ab875d29627bcebfbf222fb3e17f0ba8
                         category = if (it == "Todas") null else it
                     }
                 }
@@ -311,11 +307,7 @@ private fun TxRow(
         CategoryAvatar(item.category)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-<<<<<<< HEAD
             Text(item.clean.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge)
-=======
-            Text(tx.description, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge)
->>>>>>> ca3862f5ab875d29627bcebfbf222fb3e17f0ba8
             Spacer(Modifier.height(2.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
@@ -323,10 +315,7 @@ private fun TxRow(
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false)
                 )
-<<<<<<< HEAD
                 KindPills(item.clean.kind, item.clean.parcel)
-=======
->>>>>>> ca3862f5ab875d29627bcebfbf222fb3e17f0ba8
                 if (tx.pending) Pill("pendente")
                 if (item.manual) Pill("manual")
                 if (item.metaIgnored) Pill("ignorada")
@@ -371,18 +360,12 @@ private fun DetailSheet(
                 CategoryAvatar(item.category, 52.dp)
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
-<<<<<<< HEAD
                     Text(item.clean.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     Text("${dayLabel(item.tx.date)} · $accountLabel", style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 6.dp)) {
                         KindPills(item.clean.kind, item.clean.parcel)
                     }
-=======
-                    Text(item.tx.description, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Text("${dayLabel(item.tx.date)} · $accountLabel", style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
->>>>>>> ca3862f5ab875d29627bcebfbf222fb3e17f0ba8
                 }
             }
             Text(
@@ -390,7 +373,6 @@ private fun DetailSheet(
                 color = if (item.tx.amount >= 0) IncomeColor else MaterialTheme.colorScheme.onSurface
             )
             if (item.tx.pending) Pill("Pendente: ainda pode mudar")
-<<<<<<< HEAD
             if (item.tx.description.trim() != item.clean.title) {
                 Column {
                     Text("Descrição original do banco", style = MaterialTheme.typography.labelMedium,
@@ -398,8 +380,6 @@ private fun DetailSheet(
                     Text(item.tx.description, style = MaterialTheme.typography.bodySmall)
                 }
             }
-=======
->>>>>>> ca3862f5ab875d29627bcebfbf222fb3e17f0ba8
 
             if (similar.size > 1) {
                 NCard(Modifier.fillMaxWidth(), container = MaterialTheme.colorScheme.secondaryContainer, padding = 14.dp) {
@@ -408,11 +388,7 @@ private fun DetailSheet(
                         "${similar.size} lançamentos parecidos · total ${money(total)} · média ${money(total / similar.size)}",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSecondaryContainer
                     )
-<<<<<<< HEAD
                     TextButton(onClick = { onSimilar(item.clean.title.take(18)); onClose() }) { Text("Ver todos no extrato") }
-=======
-                    TextButton(onClick = { onSimilar(item.tx.description.take(18)); onClose() }) { Text("Ver todos no extrato") }
->>>>>>> ca3862f5ab875d29627bcebfbf222fb3e17f0ba8
                 }
             }
 

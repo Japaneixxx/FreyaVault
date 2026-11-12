@@ -45,8 +45,5 @@ fun ago(ms: Long): String {
 }
 
 fun weekdayName(d: DayOfWeek): String = d.getDisplayName(TextStyle.FULL, ptBR)
-<<<<<<< HEAD
 
 fun pct(v: Double): String = String.format(ptBR, "%.2f%%", v)
-=======
->>>>>>> ca3862f5ab875d29627bcebfbf222fb3e17f0ba8

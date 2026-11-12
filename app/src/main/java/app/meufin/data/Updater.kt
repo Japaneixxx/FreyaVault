@@ -18,11 +18,7 @@ data class UpdateRelease(
 
 object Updater {
     private const val latestReleaseUrl =
-<<<<<<< HEAD
         "https://api.github.com/repos/Japaneixxx/FreyaVault/releases/latest"
-=======
-        "https://api.github.com/repos/Japaneixxx/MeuFinanceiro/releases/latest"
->>>>>>> ca3862f5ab875d29627bcebfbf222fb3e17f0ba8
     private val client = OkHttpClient()
 
     suspend fun check(): UpdateRelease? = withContext(Dispatchers.IO) {
@@ -31,10 +27,7 @@ object Updater {
             .header("Accept", "application/vnd.github+json")
             .build()
         client.newCall(request).execute().use { response ->
-<<<<<<< HEAD
             if (response.code == 404) return@withContext null // repositório ainda sem Release publicada
-=======
->>>>>>> ca3862f5ab875d29627bcebfbf222fb3e17f0ba8
             if (!response.isSuccessful) error("GitHub retornou HTTP ${response.code}")
             val json = JSONObject(response.body?.string().orEmpty())
             val version = json.optString("tag_name").removePrefix("v")
