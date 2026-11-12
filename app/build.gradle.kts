@@ -30,8 +30,13 @@ android {
         applicationId = "app.meufin"
         minSdk = 26
         targetSdk = 34
+<<<<<<< HEAD
         versionCode = 16
         versionName = "1.8.0"
+=======
+        versionCode = 15
+        versionName = "1.7.0"
+>>>>>>> 2eee424a4ab0105c27cd1f804246c10d3dbb2c6b
     }
 
     buildTypes {
