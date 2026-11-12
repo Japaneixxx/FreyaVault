@@ -3,6 +3,8 @@ package com.japaneixxx.freya.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.text.input.KeyboardType
@@ -938,6 +940,11 @@ private fun OneTimeIncomeSheet(
     var showDatePicker by remember { mutableStateOf(false) }
     val amount = parseAmount(value)
     val validDate = runCatching { LocalDate.parse(date) }.getOrNull()
+    val dateFieldInteraction = remember { MutableInteractionSource() }
+    val dateFieldPressed by dateFieldInteraction.collectIsPressedAsState()
+    LaunchedEffect(dateFieldPressed) {
+        if (dateFieldPressed) showDatePicker = true
+    }
     val datePickerState = rememberDatePickerState(
         initialSelectedDateMillis = validDate?.atStartOfDay(ZoneId.systemDefault())?.toInstant()?.toEpochMilli()
     )
@@ -959,7 +966,8 @@ private fun OneTimeIncomeSheet(
                 label = { Text("Data do recebimento") },
                 singleLine = true,
                 readOnly = true,
-                modifier = Modifier.fillMaxWidth().clickable { showDatePicker = true },
+                modifier = Modifier.fillMaxWidth(),
+                interactionSource = dateFieldInteraction,
                 isError = validDate == null
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
