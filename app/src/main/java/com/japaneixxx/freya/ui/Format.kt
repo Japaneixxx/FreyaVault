@@ -14,6 +14,7 @@ import java.util.Locale
 private val ptBR = Locale("pt", "BR")
 private val brl: NumberFormat = NumberFormat.getCurrencyInstance(ptBR)
 private val dayFmt = DateTimeFormatter.ofPattern("EEEE, d 'de' MMMM", ptBR)
+private val dateBrFmt = DateTimeFormatter.ofPattern("dd/MM/yyyy", ptBR)
 
 /** Modo privacidade: esconde todos os valores do app. */
 object Privacy { var hidden by mutableStateOf(false) }
@@ -32,6 +33,9 @@ fun shortMonth(ym: YearMonth): String =
 
 fun dayLabel(iso: String): String =
     runCatching { LocalDate.parse(iso).format(dayFmt).replaceFirstChar { it.uppercase() } }.getOrDefault(iso)
+
+fun dateBrLabel(iso: String): String =
+    runCatching { LocalDate.parse(iso).format(dateBrFmt) }.getOrDefault(iso)
 
 fun ago(ms: Long): String {
     if (ms == 0L) return "nunca"

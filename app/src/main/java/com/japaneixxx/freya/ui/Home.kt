@@ -38,6 +38,7 @@ fun HomeScreen(vm: AppViewModel, goPlan: () -> Unit, goAlerts: () -> Unit, goAge
     val envelopes by vm.envelopes.collectAsState()
     val payments by vm.billPayments.collectAsState()
     val incomes by vm.incomes.collectAsState()
+    val oneTimeIncomes by vm.oneTimeIncomes.collectAsState()
     val alerts by vm.chargeAlerts.collectAsState()
     var month by rememberSaveable { mutableStateOf(monthKey()) }
     var adding by remember { mutableStateOf(false) }
@@ -79,7 +80,9 @@ fun HomeScreen(vm: AppViewModel, goPlan: () -> Unit, goAlerts: () -> Unit, goAge
             .sortedByDescending { it.second / it.third }.take(3)
     }
 
-    val agenda = remember(bank, bills, payments, incomes, accounts) { buildAgenda(bank, bills, payments, incomes, accounts) }
+    val agenda = remember(bank, bills, payments, incomes, oneTimeIncomes, accounts) {
+        buildAgenda(bank, bills, payments, incomes, accounts, oneTimeIncomes = oneTimeIncomes)
+    }
     val endOfMonth = YearMonth.now().atEndOfMonth()
     val monthEvents = agenda.filter { !it.date.isAfter(endOfMonth) }
     val endBalance = monthEvents.lastOrNull()?.balanceAfter

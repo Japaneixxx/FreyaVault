@@ -37,6 +37,11 @@ object Backup {
                     .put("day", it.day).put("businessDay", it.businessDay))
             }
         })
+        o.put("oneTimeIncomes", JSONArray().also { a ->
+            dao.oneTimeIncomesNow().forEach {
+                a.put(JSONObject().put("id", it.id).put("name", it.name).put("amount", it.amount).put("date", it.date))
+            }
+        })
         o.put("rules", JSONArray().also { a ->
             dao.rulesNow().forEach { a.put(JSONObject().put("key", it.ruleKey).put("category", it.category)) }
         })
@@ -83,6 +88,9 @@ object Backup {
         o.optJSONArray("billPayments").each { dao.putBillPayment(BillPayment(it.getLong("billId"), it.getString("month"), it.getDouble("amount"))); n++ }
         o.optJSONArray("incomes").each {
             dao.putIncome(Income(it.optLong("id"), it.getString("name"), it.getDouble("amount"), it.getInt("day"), it.optBoolean("businessDay"))); n++
+        }
+        o.optJSONArray("oneTimeIncomes").each {
+            dao.putOneTimeIncome(OneTimeIncome(it.optLong("id"), it.getString("name"), it.getDouble("amount"), it.getString("date"))); n++
         }
         o.optJSONArray("rules").each { dao.putRule(Rule(it.getString("key"), it.getString("category"))); n++ }
         o.optJSONArray("metas").each {

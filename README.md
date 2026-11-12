@@ -18,6 +18,7 @@ investimentos diretamente no aparelho.
   receitas previstas e agenda de 45 dias.
 - Contas e cartões podem ser renomeados dentro do app (Mais > Contas ou Planejar > Cartões); o nome do banco
   não muda e o apelido sobrevive às sincronizações e entra no backup.
+- Recebimentos futuros podem ser recorrentes ou avulsos, para entradas únicas como freelances e bônus.
 - Aba Patrimônio com investimentos do Pluggy, bens, dívidas e evolução do patrimônio.
 - Simulador de investimentos na aba Patrimônio: juros compostos com aportes, rentabilidade em % a.a., % a.m.,
   % do CDI ou IPCA + taxa (CDI e IPCA digitados ou buscados na API pública do Banco Central), IR regressivo,

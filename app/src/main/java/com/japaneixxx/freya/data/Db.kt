@@ -82,6 +82,15 @@ data class Income(
     val businessDay: Boolean = false
 )
 
+/** Entrada prevista para uma única data, como um freelance ou bônus. */
+@Entity(tableName = "one_time_incomes")
+data class OneTimeIncome(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val amount: Double,
+    val date: String
+)
+
 /** Foto diária do saldo, para o gráfico de evolução. */
 @Entity(tableName = "snapshots")
 data class Snapshot(@PrimaryKey val date: String, val bank: Double, val cards: Double)
@@ -135,6 +144,7 @@ interface FinDao {
     @Query("SELECT * FROM net_snapshots ORDER BY date") fun netSnapshots(): Flow<List<NetSnapshot>>
     @Query("SELECT * FROM bill_payments") fun billPayments(): Flow<List<BillPayment>>
     @Query("SELECT * FROM incomes ORDER BY day, name") fun incomes(): Flow<List<Income>>
+    @Query("SELECT * FROM one_time_incomes ORDER BY date, name") fun oneTimeIncomes(): Flow<List<OneTimeIncome>>
 
     // leituras pontuais (alertas em segundo plano e backup)
     @Query("SELECT * FROM accounts") suspend fun accountsNow(): List<Account>
@@ -150,6 +160,7 @@ interface FinDao {
     @Query("SELECT * FROM envelopes") suspend fun envelopesNow(): List<Envelope>
     @Query("SELECT * FROM bill_payments") suspend fun billPaymentsNow(): List<BillPayment>
     @Query("SELECT * FROM incomes") suspend fun incomesNow(): List<Income>
+    @Query("SELECT * FROM one_time_incomes") suspend fun oneTimeIncomesNow(): List<OneTimeIncome>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertAccounts(list: List<Account>)
     @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insertTx(list: List<Tx>): List<Long>
@@ -170,11 +181,14 @@ interface FinDao {
     @Query("DELETE FROM envelopes WHERE category = :c") suspend fun deleteEnvelope(c: String)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putBillPayment(p: BillPayment)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putIncome(i: Income)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putOneTimeIncome(i: OneTimeIncome)
     @Query("DELETE FROM bill_payments WHERE billId = :billId AND month = :month") suspend fun deleteBillPayment(billId: Long, month: String)
     @Query("DELETE FROM bill_payments WHERE billId = :billId") suspend fun deletePaymentsOf(billId: Long)
     @Query("DELETE FROM incomes WHERE id = :id") suspend fun deleteIncome(id: Long)
+    @Query("DELETE FROM one_time_incomes WHERE id = :id") suspend fun deleteOneTimeIncome(id: Long)
     @Query("DELETE FROM bill_payments") suspend fun clearBillPayments()
     @Query("DELETE FROM incomes") suspend fun clearIncomes()
+    @Query("DELETE FROM one_time_incomes") suspend fun clearOneTimeIncomes()
     @Query("DELETE FROM investments") suspend fun clearInvestments()
     @Query("DELETE FROM net_items") suspend fun clearNetItems()
     @Query("DELETE FROM envelopes") suspend fun clearEnvelopes()
@@ -200,6 +214,15 @@ interface FinDao {
     @Query("DELETE FROM tx_meta") suspend fun clearMetas()
     @Query("DELETE FROM bills") suspend fun clearBills()
     @Query("DELETE FROM snapshots") suspend fun clearSnapshots()
+}
+
+private val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `one_time_incomes` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "`name` TEXT NOT NULL, `amount` REAL NOT NULL, `date` TEXT NOT NULL)"
+        )
+    }
 }
 
 private val MIGRATION_2_3 = object : Migration(2, 3) {
@@ -262,8 +285,8 @@ private val MIGRATION_4_5 = object : Migration(4, 5) {
 @Database(
     entities = [Account::class, Tx::class, Rule::class, Budget::class, Goal::class,
         TxMeta::class, Bill::class, Snapshot::class, Investment::class, NetItem::class,
-        Envelope::class, NetSnapshot::class, BillPayment::class, Income::class],
-    version = 5, exportSchema = false
+        Envelope::class, NetSnapshot::class, BillPayment::class, Income::class, OneTimeIncome::class],
+    version = 6, exportSchema = false
 )
 abstract class Db : RoomDatabase() {
     abstract fun dao(): FinDao
@@ -272,7 +295,7 @@ abstract class Db : RoomDatabase() {
         @Volatile private var inst: Db? = null
         fun get(ctx: Context): Db = inst ?: synchronized(this) {
             inst ?: Room.databaseBuilder(ctx.applicationContext, Db::class.java, "fin.db")
-                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 .fallbackToDestructiveMigrationFrom(1) // v1 só tinha dados re-sincronizáveis
                 .build().also { inst = it }
         }

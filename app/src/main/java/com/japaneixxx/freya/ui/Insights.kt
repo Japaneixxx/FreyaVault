@@ -4,6 +4,7 @@ import com.japaneixxx.freya.data.Account
 import com.japaneixxx.freya.data.Bill
 import com.japaneixxx.freya.data.BillPayment
 import com.japaneixxx.freya.data.Income
+import com.japaneixxx.freya.data.OneTimeIncome
 import com.japaneixxx.freya.data.Rule
 import com.japaneixxx.freya.data.Tx
 import com.japaneixxx.freya.data.TxMeta
@@ -229,7 +230,8 @@ data class AgendaEvent(
 /** Linha do tempo dos próximos [days] dias: receitas, contas, parcelas e faturas, com o saldo previsto. */
 fun buildAgenda(
     bank: Double, bills: List<Bill>, payments: List<BillPayment>,
-    incomes: List<Income>, accounts: List<Account>, days: Long = 45
+    incomes: List<Income>, accounts: List<Account>, days: Long = 45,
+    oneTimeIncomes: List<OneTimeIncome> = emptyList()
 ): List<AgendaEvent> {
     data class Raw(val date: LocalDate, val name: String, val amount: Double, val type: String, val note: String?)
     val today = LocalDate.now()
@@ -252,6 +254,10 @@ fun buildAgenda(
         incomes.forEach { i ->
             val d = incomeDate(i, ym)
             if (!d.isBefore(today) && !d.isAfter(limit)) raw += Raw(d, i.name, i.amount, "INCOME", null)
+        }
+        oneTimeIncomes.forEach { i ->
+            val d = runCatching { LocalDate.parse(i.date) }.getOrNull() ?: return@forEach
+            if (!d.isBefore(today) && !d.isAfter(limit)) raw += Raw(d, i.name, i.amount, "INCOME", "Recebimento avulso")
         }
     }
     accounts.filter { it.type == "CREDIT" && it.balance > 0 }.forEach { a ->

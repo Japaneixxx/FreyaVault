@@ -13,15 +13,18 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.clickable
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.japaneixxx.freya.data.Bill
 import com.japaneixxx.freya.data.BillPayment
 import com.japaneixxx.freya.data.Income
+import com.japaneixxx.freya.data.OneTimeIncome
 import com.japaneixxx.freya.data.Budget
 import com.japaneixxx.freya.data.Goal
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import kotlin.math.roundToInt
 
@@ -778,11 +781,16 @@ private fun AgendaSection(vm: AppViewModel) {
     val bills by vm.bills.collectAsState()
     val payments by vm.billPayments.collectAsState()
     val incomes by vm.incomes.collectAsState()
+    val oneTimeIncomes by vm.oneTimeIncomes.collectAsState()
     var editing by remember { mutableStateOf<Income?>(null) }
     var creating by remember { mutableStateOf(false) }
+    var editingOneTime by remember { mutableStateOf<OneTimeIncome?>(null) }
+    var creatingOneTime by remember { mutableStateOf(false) }
 
     val bank = accounts.filter { it.type == "BANK" }.sumOf { it.balance }
-    val agenda = remember(bank, bills, payments, incomes, accounts) { buildAgenda(bank, bills, payments, incomes, accounts) }
+    val agenda = remember(bank, bills, payments, incomes, oneTimeIncomes, accounts) {
+        buildAgenda(bank, bills, payments, incomes, accounts, oneTimeIncomes = oneTimeIncomes)
+    }
     val endOfMonth = YearMonth.now().atEndOfMonth()
     val endBalance = agenda.lastOrNull { !it.date.isAfter(endOfMonth) }?.balanceAfter ?: bank
     val incomeLeft = agenda.filter { it.type == "INCOME" && !it.date.isAfter(endOfMonth) }.sumOf { it.amount }
@@ -845,8 +853,20 @@ private fun AgendaSection(vm: AppViewModel) {
                         TextButton(onClick = { editing = i }) { Text("Editar") }
                     }
                 }
+                oneTimeIncomes.forEach { i ->
+                    Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        Text("💸", Modifier.padding(end = 12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(i.name, style = MaterialTheme.typography.bodyLarge)
+                            Text("Uma vez · ${dayLabel(i.date)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Text("+ ${money(i.amount)}", color = IncomeColor, fontWeight = FontWeight.Medium)
+                        TextButton(onClick = { editingOneTime = i }) { Text("Editar") }
+                    }
+                }
                 Spacer(Modifier.height(8.dp))
                 OutlinedButton(onClick = { creating = true }) { Text("+ Receita prevista") }
+                OutlinedButton(onClick = { creatingOneTime = true }) { Text("+ Recebimento avulso") }
             }
         }
 
@@ -901,6 +921,78 @@ private fun AgendaSection(vm: AppViewModel) {
 
     if (creating) IncomeSheet(null, { creating = false }) { vm.saveIncome(it) }
     editing?.let { i -> IncomeSheet(i, { editing = null }, onDelete = { vm.deleteIncome(i) }) { vm.saveIncome(it) } }
+    if (creatingOneTime) OneTimeIncomeSheet(null, { creatingOneTime = false }) { vm.saveOneTimeIncome(it) }
+    editingOneTime?.let { i ->
+        OneTimeIncomeSheet(i, { editingOneTime = null }, onDelete = { vm.deleteOneTimeIncome(i) }) { vm.saveOneTimeIncome(it) }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun OneTimeIncomeSheet(
+    existing: OneTimeIncome?, onDismiss: () -> Unit, onDelete: (() -> Unit)? = null, onSave: (OneTimeIncome) -> Unit
+) {
+    var name by remember { mutableStateOf(existing?.name ?: "Recebimento avulso") }
+    var value by remember { mutableStateOf(existing?.amount?.let { "%.2f".format(it) } ?: "") }
+    var date by remember { mutableStateOf(existing?.date ?: LocalDate.now().toString()) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    val amount = parseAmount(value)
+    val validDate = runCatching { LocalDate.parse(date) }.getOrNull()
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = validDate?.atStartOfDay(ZoneId.systemDefault())?.toInstant()?.toEpochMilli()
+    )
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        Column(
+            Modifier.padding(horizontal = 24.dp).padding(bottom = 32.dp).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("Recebimento avulso", style = MaterialTheme.typography.headlineSmall)
+            Text("Use para entradas que acontecerão uma única vez, como um freelance.", style = MaterialTheme.typography.bodySmall)
+            OutlinedTextField(name, { name = it }, label = { Text("Descrição") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(
+                value, { value = it }, label = { Text("Valor (R$)") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+            )
+            OutlinedTextField(
+                value = validDate?.let { dateBrLabel(it.toString()) } ?: date,
+                onValueChange = {},
+                label = { Text("Data do recebimento") },
+                singleLine = true,
+                readOnly = true,
+                modifier = Modifier.fillMaxWidth().clickable { showDatePicker = true },
+                isError = validDate == null
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    enabled = name.isNotBlank() && amount != null && amount > 0 && validDate != null,
+                    onClick = {
+                        onSave(OneTimeIncome(existing?.id ?: 0, name.trim(), amount ?: return@Button, validDate.toString()))
+                        onDismiss()
+                    }
+                ) { Text("Salvar") }
+                if (onDelete != null) OutlinedButton(onClick = { onDelete(); onDismiss() }) { Text("Excluir") }
+            }
+        }
+        if (showDatePicker) {
+            DatePickerDialog(
+                onDismissRequest = { showDatePicker = false },
+                confirmButton = {
+                    TextButton(onClick = {
+                        datePickerState.selectedDateMillis?.let {
+                            date = java.time.Instant.ofEpochMilli(it)
+                                .atZone(ZoneId.systemDefault()).toLocalDate().toString()
+                        }
+                        showDatePicker = false
+                    }) { Text("OK") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDatePicker = false }) { Text("Cancelar") }
+                }
+            ) {
+                DatePicker(state = datePickerState)
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

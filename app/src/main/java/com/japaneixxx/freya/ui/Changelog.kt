@@ -23,6 +23,15 @@ data class ReleaseNote(
  */
 val releaseNotes: List<ReleaseNote> = listOf(
     ReleaseNote(
+        "1.8.3", "Recebimentos avulsos e calendário",
+        listOf(
+            "Cadastre entradas que acontecerão uma única vez, como o pagamento de um freelance.",
+            "O recebimento aparece na Agenda e é salvo no backup.",
+            "Escolha a data usando o calendário do Android; ela aparece no padrão dd/mm/aaaa."
+        ),
+        codename = "Fimbulwinter"
+    ),
+    ReleaseNote(
         "1.8.2", "Novo identificador do app",
         listOf(
             "O Freya agora usa o identificador técnico com.japaneixxx.freya.",

@@ -77,6 +77,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     val envelopes = dao.envelopes().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val billPayments = dao.billPayments().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val incomes = dao.incomes().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val oneTimeIncomes = dao.oneTimeIncomes().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val netSnapshots = dao.netSnapshots().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val txs = combine(dao.transactions(), dao.rules(), dao.metas()) { list, r, m -> buildItems(list, r, m) }
@@ -422,6 +423,14 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { dao.deleteIncome(income.id) }
     }
 
+    fun saveOneTimeIncome(income: OneTimeIncome) {
+        viewModelScope.launch { dao.putOneTimeIncome(income) }
+    }
+
+    fun deleteOneTimeIncome(income: OneTimeIncome) {
+        viewModelScope.launch { dao.deleteOneTimeIncome(income.id) }
+    }
+
     /**
      * Dá baixa em compromissos cuja palavra-chave apareceu no extrato do mês.
      * Contas fixas/financiamentos só casam se o valor estiver até 25% do esperado.
@@ -500,6 +509,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
             dao.clearBudgets(); dao.clearGoals(); dao.clearMetas()
             dao.clearBills(); dao.clearSnapshots()
             dao.clearBillPayments(); dao.clearIncomes()
+            dao.clearOneTimeIncomes()
             dao.clearInvestments(); dao.clearNetItems(); dao.clearEnvelopes(); dao.clearNetSnapshots()
             settings.clearAccountAliases()
             aliases.value = emptyMap()
