@@ -238,12 +238,12 @@ fun buildAgenda(
     val limit = today.plusDays(days)
     val raw = mutableListOf<Raw>()
 
-    (0..2).map { YearMonth.now().plusMonths(it.toLong()) }.forEach { ym ->
-        bills.forEach { b ->
-            if (!isBillActive(b, ym)) return@forEach
-            if (ym == YearMonth.now() && isPaid(b)) return@forEach
+    (0..2).map { YearMonth.now().plusMonths(it.toLong()) }.forEach monthLoop@{ ym ->
+        bills.forEach billLoop@{ b ->
+            if (!isBillActive(b, ym)) return@billLoop
+            if (ym == YearMonth.now() && isPaid(b)) return@billLoop
             val due = billDueDate(b, ym)
-            if (due.isAfter(limit)) return@forEach
+            if (due.isAfter(limit)) return@billLoop
             val overdue = due.isBefore(today)
             val parts = mutableListOf<String>()
             installmentNumber(b, ym)?.let { n -> parts += "parcela $n/${b.totalInstallments ?: "?"}" }
@@ -251,17 +251,17 @@ fun buildAgenda(
             if (overdue) parts += "atrasada"
             raw += Raw(if (overdue) today else due, b.name, -billEstimate(b, payments), "BILL", parts.joinToString(" · ").ifBlank { null })
         }
-        incomes.forEach { i ->
+        incomes.forEach incomeLoop@{ i ->
             val d = incomeDate(i, ym)
             if (!d.isBefore(today) && !d.isAfter(limit)) raw += Raw(d, i.name, i.amount, "INCOME", null)
         }
-        oneTimeIncomes.forEach { i ->
-            val d = runCatching { LocalDate.parse(i.date) }.getOrNull() ?: return@forEach
+        oneTimeIncomes.forEach oneTimeLoop@{ i ->
+            val d = runCatching { LocalDate.parse(i.date) }.getOrNull() ?: return@oneTimeLoop
             if (!d.isBefore(today) && !d.isAfter(limit)) raw += Raw(d, i.name, i.amount, "INCOME", "Recebimento avulso")
         }
     }
-    accounts.filter { it.type == "CREDIT" && it.balance > 0 }.forEach { a ->
-        val d = a.dueDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return@forEach
+    accounts.filter { it.type == "CREDIT" && it.balance > 0 }.forEach cardLoop@{ a ->
+        val d = a.dueDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return@cardLoop
         if (!d.isBefore(today) && !d.isAfter(limit)) raw += Raw(d, "Fatura ${a.institution}", -a.balance, "CARD", a.name)
     }
 
