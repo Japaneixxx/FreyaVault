@@ -100,19 +100,21 @@ fun AppTheme(mode: Int = 0, content: @Composable () -> Unit) {
     )
 }
 
-/** Cartão nórdico: sem sombra, borda fina, cantos generosos. */
+/** Cartão nórdico: borda fina, cantos generosos e resposta elástica ao toque. */
 @Composable
 fun NCard(
     modifier: Modifier = Modifier,
     container: Color = MaterialTheme.colorScheme.surface,
     padding: Dp = 18.dp,
+    onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val clickModifier = if (onClick != null) modifier.springClickable(onClick = onClick) else modifier
     Card(
-        modifier = modifier,
+        modifier = clickModifier,
         shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(containerColor = container),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.85f))
     ) {
         Column(Modifier.padding(padding)) { content() }
     }

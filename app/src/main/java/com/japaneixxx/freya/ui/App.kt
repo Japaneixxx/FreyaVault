@@ -1,6 +1,18 @@
 package com.japaneixxx.freya.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -9,6 +21,8 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -110,32 +124,70 @@ fun App(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
                     val colors = NavigationBarItemDefaults.colors(indicatorColor = MaterialTheme.colorScheme.primaryContainer)
-                    NavigationBarItem(tab == 0, { navigateTo(0) }, { Icon(Icons.Default.Home, null) }, label = { Text("Início") }, colors = colors)
-                    NavigationBarItem(tab == 1, { navigateTo(1) }, { Icon(Icons.Default.List, null) }, label = { Text("Extrato") }, colors = colors)
-                    NavigationBarItem(tab == 2, { navigateTo(2) }, { Icon(Icons.Default.AccountBox, null) }, label = { Text("Patrimônio") }, colors = colors)
-                    NavigationBarItem(tab == 3, { navigateTo(3) }, { Icon(Icons.Default.CheckCircle, null) }, label = { Text("Planejar") }, colors = colors)
-                    NavigationBarItem(tab == 4, { navigateTo(4) }, { Icon(Icons.Default.Menu, null) }, label = { Text("Mais") }, colors = colors)
+                    NavigationBarItem(tab == 0, { navigateTo(0) }, { NavIcon(Icons.Default.Home, tab == 0) }, label = { Text("Início") }, colors = colors)
+                    NavigationBarItem(tab == 1, { navigateTo(1) }, { NavIcon(Icons.Default.List, tab == 1) }, label = { Text("Extrato") }, colors = colors)
+                    NavigationBarItem(tab == 2, { navigateTo(2) }, { NavIcon(Icons.Default.AccountBox, tab == 2) }, label = { Text("Patrimônio") }, colors = colors)
+                    NavigationBarItem(tab == 3, { navigateTo(3) }, { NavIcon(Icons.Default.CheckCircle, tab == 3) }, label = { Text("Planejar") }, colors = colors)
+                    NavigationBarItem(tab == 4, { navigateTo(4) }, { NavIcon(Icons.Default.Menu, tab == 4) }, label = { Text("Mais") }, colors = colors)
                 }
             }
         }
     ) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
-            if (vm.syncing) LinearProgressIndicator(Modifier.fillMaxWidth())
-            when (tab) {
-                0 -> HomeScreen(
-                    vm,
-                    goPlan = { navigateTo(3) },
-                    goAlerts = { planSection = PlanSection.CHARGES; navigateTo(3) },
-                    goAgenda = { planSection = PlanSection.AGENDA; navigateTo(3) }
-                )
-                1 -> ExtratoScreen(vm)
-                2 -> NetWorthScreen(vm)
-                3 -> PlanScreen(vm, planSection) { planSection = it }
-                else -> MoreScreen(vm)
+            AnimatedVisibility(
+                visible = vm.syncing,
+                enter = expandVertically(tween(220)) + fadeIn(tween(180)),
+                exit = shrinkVertically(tween(180)) + fadeOut(tween(120))
+            ) {
+                LinearProgressIndicator(Modifier.fillMaxWidth())
+            }
+            AnimatedContent(
+                targetState = tab,
+                transitionSpec = {
+                    val forward = targetState > initialState
+                    val enter = fadeIn(tween(260)) +
+                        slideInHorizontally(tween(320, easing = Motion.EaseOut)) { w ->
+                            if (forward) w / 7 else -w / 7
+                        }
+                    val exit = fadeOut(tween(150)) +
+                        slideOutHorizontally(tween(240, easing = Motion.EaseOut)) { w ->
+                            if (forward) -w / 12 else w / 12
+                        }
+                    enter togetherWith exit
+                },
+                label = "tabContent",
+                modifier = Modifier.fillMaxSize()
+            ) { current ->
+                when (current) {
+                    0 -> HomeScreen(
+                        vm,
+                        goPlan = { navigateTo(3) },
+                        goAlerts = { planSection = PlanSection.CHARGES; navigateTo(3) },
+                        goAgenda = { planSection = PlanSection.AGENDA; navigateTo(3) }
+                    )
+                    1 -> ExtratoScreen(vm)
+                    2 -> NetWorthScreen(vm)
+                    3 -> PlanScreen(vm, planSection) { planSection = it }
+                    else -> MoreScreen(vm)
+                }
             }
         }
     }
     }
+}
+
+@Composable
+private fun NavIcon(icon: ImageVector, selected: Boolean) {
+    val scale by animateFloatAsState(
+        targetValue = if (selected) 1.16f else 1f,
+        animationSpec = spring(dampingRatio = 0.5f, stiffness = 650f),
+        label = "navIcon"
+    )
+    Icon(
+        icon,
+        contentDescription = null,
+        modifier = Modifier.graphicsLayer { scaleX = scale; scaleY = scale }
+    )
 }
 
 @Composable
@@ -149,7 +201,12 @@ private fun LockScreen(hasPin: Boolean, onUnlock: () -> Unit, onPinUnlock: (Stri
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Icon(Icons.Default.Lock, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(48.dp))
+            Icon(
+                Icons.Default.Lock,
+                null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(48.dp).pulse()
+            )
             Spacer(Modifier.height(16.dp))
             Text("Freya", style = MaterialTheme.typography.headlineMedium)
             Text("Bloqueado", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

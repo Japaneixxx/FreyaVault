@@ -20,6 +20,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.text.style.TextAlign
@@ -60,15 +64,41 @@ fun CategoryAvatar(category: String, size: Dp = 42.dp) {
     ) { Text(emojiFor(category), fontSize = (size.value * 0.44f).sp) }
 }
 
-/** Barra de progresso arredondada e animada. */
+/** Barra de progresso arredondada, animada e com leve gradiente. */
 @Composable
 fun NProgress(fraction: Float, color: Color, modifier: Modifier = Modifier, height: Dp = 8.dp) {
-    val f by animateFloatAsState(fraction.coerceIn(0f, 1f), tween(700), label = "progress")
+    val f by animateFloatAsState(fraction.coerceIn(0f, 1f), tween(700, easing = Motion.EaseOut), label = "progress")
     Box(
         modifier.fillMaxWidth().height(height).clip(RoundedCornerShape(50))
             .background(MaterialTheme.colorScheme.surfaceVariant)
     ) {
-        Box(Modifier.fillMaxHeight().fillMaxWidth(f).clip(RoundedCornerShape(50)).background(color))
+        Box(
+            Modifier.fillMaxHeight().fillMaxWidth(f).clip(RoundedCornerShape(50))
+                .background(Brush.horizontalGradient(listOf(color.copy(alpha = 0.65f), color)))
+        )
+    }
+}
+
+/** Divisão receitas × despesas que cresce suavemente ao aparecer. */
+@Composable
+fun AnimatedSplitBar(income: Double, expense: Double, modifier: Modifier = Modifier, height: Dp = 6.dp) {
+    if (income <= 0.0 && expense <= 0.0) return
+    val total = (income + expense).coerceAtLeast(0.0001)
+    val target = (income / total).toFloat().coerceIn(0f, 1f)
+    val fraction by animateFloatAsState(target, tween(900, easing = Motion.EaseOut), label = "split")
+    Canvas(modifier.fillMaxWidth().height(height)) {
+        val radius = size.height / 2f
+        val gap = 3.dp.toPx()
+        val usable = (size.width - gap).coerceAtLeast(0f)
+        val incomeWidth = usable * fraction
+        if (incomeWidth > 0f) {
+            drawRoundRect(IncomeColor, size = Size(incomeWidth, size.height), cornerRadius = CornerRadius(radius))
+        }
+        val start = incomeWidth + gap
+        val rest = (size.width - start).coerceAtLeast(0f)
+        if (rest > 0f && expense > 0.0) {
+            drawRoundRect(ExpenseColor, topLeft = Offset(start, 0f), size = Size(rest, size.height), cornerRadius = CornerRadius(radius))
+        }
     }
 }
 

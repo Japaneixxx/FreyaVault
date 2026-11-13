@@ -87,8 +87,8 @@ fun MoreScreen(vm: AppViewModel) {
 
         SectionTitle("Contas")
         if (accounts.isEmpty()) Text("Nenhuma conta ainda. Toque em sincronizar.", style = MaterialTheme.typography.bodyMedium)
-        groups.forEach { (inst, list) ->
-            NCard(Modifier.fillMaxWidth()) {
+        groups.entries.forEachIndexed { index, (inst, list) ->
+            NCard(Modifier.fillMaxWidth().appear(index)) {
                 Text(inst, style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(8.dp))
                 list.forEach { a ->
@@ -101,7 +101,7 @@ fun MoreScreen(vm: AppViewModel) {
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        Text(money(a.balance), fontWeight = FontWeight.Medium)
+                        AnimatedMoney(a.balance, fontWeight = FontWeight.Medium)
                         TextButton(onClick = { renamingAccount = a }) { Text("Renomear") }
                     }
                 }

@@ -257,7 +257,12 @@ fun InvestCalcScreen(vm: AppViewModel, onBack: () -> Unit) {
                         if (tax == TaxMode.REGRESSIVE) "Você terá, já descontado o IR" else "Você terá",
                         style = MaterialTheme.typography.labelLarge, color = c.copy(alpha = 0.8f)
                     )
-                    Text(money(result.net), style = MaterialTheme.typography.displaySmall, color = c)
+                    AnimatedMoney(
+                        value = result.net,
+                        style = MaterialTheme.typography.displaySmall,
+                        color = c,
+                        durationMillis = 1200
+                    )
                     Text(
                         "em ${input.months} ${if (input.months == 1) "mês" else "meses"}",
                         style = MaterialTheme.typography.bodySmall, color = c.copy(alpha = 0.8f)
@@ -325,7 +330,7 @@ fun InvestCalcScreen(vm: AppViewModel, onBack: () -> Unit) {
                             Text("aportado ${money(s.invested)}", style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        Text(money(s.net), fontWeight = FontWeight.Medium)
+                        AnimatedMoney(s.net, fontWeight = FontWeight.Medium)
                         TextButton(onClick = { scenarios.removeAt(i) }) { Text("Remover") }
                     }
                     NProgress((s.net / best).toFloat(), if (s.net >= best) IncomeColor else MaterialTheme.colorScheme.primary)
@@ -358,7 +363,7 @@ fun InvestCalcScreen(vm: AppViewModel, onBack: () -> Unit) {
                         else -> {
                             Text("Aporte necessário por mês", style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(money(needed), style = MaterialTheme.typography.headlineSmall)
+                            AnimatedMoney(needed, style = MaterialTheme.typography.headlineSmall)
                             Spacer(Modifier.height(6.dp))
                             OutlinedButton(onClick = { monthlyText = fmtNum(needed) }) { Text("Usar como aporte") }
                         }
@@ -410,10 +415,20 @@ private fun NumField(value: String, onChange: (String) -> Unit, label: String, i
 private fun ResultRow(label: String, value: Double, color: Color?, plus: Boolean = false, minus: Boolean = false, bold: Boolean = false) {
     Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-        Text(
-            (if (plus) "+ " else if (minus) "− " else "") + money(value),
-            color = color ?: MaterialTheme.colorScheme.onSurface,
-            fontWeight = if (bold) FontWeight.Bold else FontWeight.Medium
+        val tint = color ?: MaterialTheme.colorScheme.onSurface
+        if (plus || minus) {
+            Text(
+                if (plus) "+ " else "− ",
+                color = tint,
+                fontWeight = if (bold) FontWeight.Bold else FontWeight.Medium,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+        AnimatedMoney(
+            value = value,
+            color = tint,
+            fontWeight = if (bold) FontWeight.Bold else FontWeight.Medium,
+            style = MaterialTheme.typography.bodyMedium
         )
     }
 }

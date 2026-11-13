@@ -65,10 +65,15 @@ fun NetWorthScreen(vm: AppViewModel) {
 
         // ---------- total ----------
         item {
-            NCard(Modifier.fillMaxWidth(), container = MaterialTheme.colorScheme.primaryContainer) {
+            NCard(Modifier.fillMaxWidth().appear(0), container = MaterialTheme.colorScheme.primaryContainer) {
                 val c = MaterialTheme.colorScheme.onPrimaryContainer
                 Text("Patrimônio líquido", style = MaterialTheme.typography.labelLarge, color = c.copy(alpha = 0.8f))
-                Text(money(nw.total), style = MaterialTheme.typography.displaySmall, color = c)
+                AnimatedMoney(
+                    value = nw.total,
+                    style = MaterialTheme.typography.displaySmall,
+                    color = c,
+                    durationMillis = 1200
+                )
                 change?.let { (diff, days) ->
                     Spacer(Modifier.height(4.dp))
                     Text(
@@ -83,7 +88,7 @@ fun NetWorthScreen(vm: AppViewModel) {
 
         // ---------- composição ----------
         item {
-            NCard(Modifier.fillMaxWidth()) {
+            NCard(Modifier.fillMaxWidth().appear(1)) {
                 SectionTitle("Composição")
                 Spacer(Modifier.height(10.dp))
                 if (assetsParts.isNotEmpty()) {
@@ -101,7 +106,7 @@ fun NetWorthScreen(vm: AppViewModel) {
         }
 
         if (trend.size >= 2) item {
-            NCard(Modifier.fillMaxWidth()) {
+            NCard(Modifier.fillMaxWidth().appear(2)) {
                 SectionTitle("Evolução")
                 Spacer(Modifier.height(4.dp))
                 Text("Uma foto por dia em que você sincroniza ou altera bens e dívidas.", style = MaterialTheme.typography.bodySmall,
@@ -113,10 +118,10 @@ fun NetWorthScreen(vm: AppViewModel) {
 
         // ---------- investimentos ----------
         item {
-            NCard(Modifier.fillMaxWidth()) {
+            NCard(Modifier.fillMaxWidth().appear(3)) {
                 SectionTitle("Investimentos")
                 Spacer(Modifier.height(6.dp))
-                Text(money(invTotal), style = MaterialTheme.typography.headlineSmall)
+                AnimatedMoney(invTotal, style = MaterialTheme.typography.headlineSmall)
                 invProfit?.let {
                     Text(
                         (if (it >= 0) "Lucro acumulado " else "Prejuízo acumulado ") + money(abs(it)),
@@ -139,10 +144,10 @@ fun NetWorthScreen(vm: AppViewModel) {
                 OutlinedButton(onClick = { showCalc = true }, modifier = Modifier.fillMaxWidth()) { Text("Simular investimento") }
             }
         }
-        byType.forEach { (type, list) ->
+        byType.forEachIndexed { index, (type, list) ->
             item(key = "type_$type") {
                 val sub = list.sumOf { it.balance }
-                NCard(Modifier.fillMaxWidth(), padding = 0.dp) {
+                NCard(Modifier.fillMaxWidth().appear(index), padding = 0.dp) {
                     Row(
                         Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -167,7 +172,7 @@ fun NetWorthScreen(vm: AppViewModel) {
 
         // ---------- bens e dívidas ----------
         item {
-            NCard(Modifier.fillMaxWidth()) {
+            NCard(Modifier.fillMaxWidth().appear(4)) {
                 SectionTitle("Bens e dívidas")
                 Spacer(Modifier.height(4.dp))
                 Text(
@@ -179,9 +184,9 @@ fun NetWorthScreen(vm: AppViewModel) {
                     Button(onClick = { creatingKind = "ASSET" }) { Text("+ Bem") }
                     OutlinedButton(onClick = { creatingKind = "DEBT" }) { Text("+ Dívida") }
                 }
-                netItems.forEach { it0 ->
+                netItems.forEachIndexed { index, it0 ->
                     Row(
-                        Modifier.fillMaxWidth().padding(top = 12.dp),
+                        Modifier.fillMaxWidth().appear(index).padding(top = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         CategoryAvatar(if (it0.kind == "ASSET") "Bens" else "Dívidas", 38.dp)
@@ -213,11 +218,22 @@ private fun CompRow(label: String, value: Double, color: androidx.compose.ui.gra
         CategoryAvatar(label, 32.dp)
         Spacer(Modifier.width(12.dp))
         Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-        Text(
-            (if (value == 0.0) "" else if (plus) "+ " else "− ") + money(value),
-            color = if (value == 0.0) MaterialTheme.colorScheme.onSurfaceVariant else color,
-            fontWeight = FontWeight.Medium
-        )
+        if (value == 0.0) {
+            Text("", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            Text(
+                if (plus) "+ " else "− ",
+                color = color,
+                fontWeight = FontWeight.Medium,
+                style = MaterialTheme.typography.bodyMedium
+            )
+            AnimatedMoney(
+                value = abs(value),
+                color = color,
+                fontWeight = FontWeight.Medium,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
     }
 }
 

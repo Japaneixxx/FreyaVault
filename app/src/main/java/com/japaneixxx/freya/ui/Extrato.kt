@@ -1,6 +1,17 @@
 package com.japaneixxx.freya.ui
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -21,6 +32,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -77,19 +89,28 @@ fun ExtratoScreen(vm: AppViewModel) {
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
             // ---------- topo ----------
-            if (selecting) {
-                SelectionBar(
-                    count = selection.size,
-                    onCancel = { selection = emptySet() },
-                    onCategory = { vm.setCategoryBulk(selectedItems, it); selection = emptySet() },
-                    onIgnore = { vm.setIgnoredBulk(selectedItems, true); selection = emptySet() },
-                    onRestore = { vm.setIgnoredBulk(selectedItems, false); selection = emptySet() }
-                )
-            } else {
-                Text(
-                    "Extrato", style = MaterialTheme.typography.headlineMedium,
-                    modifier = Modifier.padding(start = 20.dp, top = 14.dp, bottom = 6.dp)
-                )
+            AnimatedContent(
+                targetState = selecting,
+                transitionSpec = {
+                    (fadeIn(tween(180)) + expandVertically(tween(220, easing = Motion.EaseOut))) togetherWith
+                        (fadeOut(tween(120)) + shrinkVertically(tween(180, easing = Motion.EaseOut)))
+                },
+                label = "selectionHeader"
+            ) { sel ->
+                if (sel) {
+                    SelectionBar(
+                        count = selection.size,
+                        onCancel = { selection = emptySet() },
+                        onCategory = { vm.setCategoryBulk(selectedItems, it); selection = emptySet() },
+                        onIgnore = { vm.setIgnoredBulk(selectedItems, true); selection = emptySet() },
+                        onRestore = { vm.setIgnoredBulk(selectedItems, false); selection = emptySet() }
+                    )
+                } else {
+                    Text(
+                        "Extrato", style = MaterialTheme.typography.headlineMedium,
+                        modifier = Modifier.padding(start = 20.dp, top = 14.dp, bottom = 6.dp)
+                    )
+                }
             }
 
             TextField(
@@ -149,17 +170,13 @@ fun ExtratoScreen(vm: AppViewModel) {
             // ---------- resumo do período ----------
             NCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), padding = 16.dp) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    SummaryItem("Entradas", money(income), IncomeColor)
-                    SummaryItem("Saídas", money(expense), ExpenseColor)
-                    SummaryItem("Saldo", money(income - expense), MaterialTheme.colorScheme.onSurface)
+                    SummaryItem("Entradas", income, IncomeColor)
+                    SummaryItem("Saídas", expense, ExpenseColor)
+                    SummaryItem("Saldo", income - expense, MaterialTheme.colorScheme.onSurface)
                 }
                 if (income + expense > 0) {
                     Spacer(Modifier.height(12.dp))
-                    Row(Modifier.fillMaxWidth().height(6.dp).background(Color.Transparent, RoundedCornerShape(50))) {
-                        Box(Modifier.weight(income.toFloat().coerceAtLeast(0.001f)).fillMaxHeight().background(IncomeColor, RoundedCornerShape(50)))
-                        Spacer(Modifier.width(3.dp))
-                        Box(Modifier.weight(expense.toFloat().coerceAtLeast(0.001f)).fillMaxHeight().background(ExpenseColor, RoundedCornerShape(50)))
-                    }
+                    AnimatedSplitBar(income, expense, Modifier.fillMaxWidth(), 6.dp)
                 }
                 Spacer(Modifier.height(8.dp))
                 Text(
@@ -177,11 +194,14 @@ fun ExtratoScreen(vm: AppViewModel) {
                 if (list.isEmpty()) item { EmptyState() }
 
                 if (sort == 0) {
-                    grouped.forEach { (date, rows) ->
+                    grouped.entries.forEachIndexed { index, (date, rows) ->
                         item(key = date) {
-                            DayBlock(date, rows, selection, selecting,
+                            DayBlock(
+                                date, rows, selection, selecting,
                                 onOpen = { selectedId = it.tx.id },
-                                onToggle = { selection = if (it.tx.id in selection) selection - it.tx.id else selection + it.tx.id })
+                                onToggle = { selection = if (it.tx.id in selection) selection - it.tx.id else selection + it.tx.id },
+                                modifier = Modifier.appear(index)
+                            )
                         }
                     }
                 } else {
@@ -219,17 +239,24 @@ fun ExtratoScreen(vm: AppViewModel) {
 private fun toggle(set: Set<String>, id: String) = if (id in set) set - id else set + id
 
 @Composable
-private fun SummaryItem(label: String, value: String, color: Color) {
+private fun SummaryItem(label: String, value: Double, color: Color) {
     Column {
         Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.titleMedium, color = color, fontWeight = FontWeight.Medium)
+        AnimatedMoney(value, style = MaterialTheme.typography.titleMedium, color = color, fontWeight = FontWeight.Medium)
     }
 }
 
 @Composable
 private fun EmptyState() {
+    val motion = rememberInfiniteTransition(label = "emptyState")
+    val floatY by motion.animateFloat(
+        initialValue = 0f,
+        targetValue = -9f,
+        animationSpec = infiniteRepeatable(tween(1900, easing = Motion.EaseInOut), RepeatMode.Reverse),
+        label = "emptyFloat"
+    )
     Column(Modifier.fillMaxWidth().padding(40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("🏔️", fontSize = 40.sp)
+        Text("🏔️", fontSize = 40.sp, modifier = Modifier.graphicsLayer { translationY = floatY })
         Spacer(Modifier.height(8.dp))
         Text("Nada por aqui", style = MaterialTheme.typography.titleMedium)
         Text(
@@ -261,10 +288,10 @@ private fun SelectionBar(
 @Composable
 private fun DayBlock(
     date: String, rows: List<TxItem>, selection: Set<String>, selecting: Boolean,
-    onOpen: (TxItem) -> Unit, onToggle: (TxItem) -> Unit
+    onOpen: (TxItem) -> Unit, onToggle: (TxItem) -> Unit, modifier: Modifier = Modifier
 ) {
     val net = rows.filter { !it.ignored }.sumOf { it.tx.amount }
-    Column(Modifier.padding(horizontal = 16.dp)) {
+    Column(modifier.padding(horizontal = 16.dp)) {
         Row(
             Modifier.fillMaxWidth().padding(start = 6.dp, end = 6.dp, top = 10.dp, bottom = 4.dp),
             horizontalArrangement = Arrangement.SpaceBetween
@@ -293,7 +320,11 @@ private fun TxRow(
     onClick: () -> Unit, onLong: () -> Unit
 ) {
     val tx = item.tx
-    val bg = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f) else Color.Transparent
+    val bg by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f) else Color.Transparent,
+        animationSpec = tween(220, easing = Motion.EaseOut),
+        label = "txSelected"
+    )
     Row(
         Modifier.fillMaxWidth().background(bg)
             .combinedClickable(onClick = onClick, onLongClick = onLong)

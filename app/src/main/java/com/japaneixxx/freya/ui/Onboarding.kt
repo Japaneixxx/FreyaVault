@@ -2,6 +2,14 @@ package com.japaneixxx.freya.ui
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -110,11 +118,14 @@ fun SetupScreen(vm: AppViewModel) {
                 Spacer(Modifier.height(14.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
                     repeat(steps.size + 1) { i ->
+                        val active = i <= step
+                        val color by animateColorAsState(
+                            targetValue = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                            animationSpec = tween(360, easing = Motion.EaseOut),
+                            label = "onboardingProgress"
+                        )
                         Box(
-                            Modifier.weight(1f).height(5.dp).background(
-                                if (i <= step) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                                RoundedCornerShape(50)
-                            )
+                            Modifier.weight(1f).height(5.dp).background(color, RoundedCornerShape(50))
                         )
                     }
                 }
@@ -126,10 +137,27 @@ fun SetupScreen(vm: AppViewModel) {
             }
 
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(24.dp)) {
-                if (step < last) StepContent(steps[step]) { url ->
-                    runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
-                        .onFailure { vm.setupError = "Não foi possível abrir o navegador." }
-                } else FinalStep(vm)
+                AnimatedContent(
+                    targetState = step,
+                    transitionSpec = {
+                        val forward = targetState > initialState
+                        val enter = fadeIn(tween(240)) +
+                            slideInHorizontally(tween(320, easing = Motion.EaseOut)) { w ->
+                                if (forward) w / 6 else -w / 6
+                            }
+                        val exit = fadeOut(tween(140)) +
+                            slideOutHorizontally(tween(240, easing = Motion.EaseOut)) { w ->
+                                if (forward) -w / 10 else w / 10
+                            }
+                        enter togetherWith exit
+                    },
+                    label = "onboardingStep"
+                ) { current ->
+                    if (current < last) StepContent(steps[current]) { url ->
+                        runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+                            .onFailure { vm.setupError = "Não foi possível abrir o navegador." }
+                    } else FinalStep(vm)
+                }
             }
 
             // navegação

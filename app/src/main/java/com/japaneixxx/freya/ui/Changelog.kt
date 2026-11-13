@@ -23,6 +23,17 @@ data class ReleaseNote(
  */
 val releaseNotes: List<ReleaseNote> = listOf(
     ReleaseNote(
+        "1.8.45", "Movimento e luz",
+        listOf(
+            "Transições suaves entre abas e seções, com entrada em cascata dos cartões.",
+            "Saldos, totais e resultados contam até o valor final, e os gráficos crescem ao abrir.",
+            "O cartão de saldo ganhou gradiente com brilho suave e montanhas ao fundo.",
+            "Barras de progresso e a divisão receita × despesa agora se animam, e os cartões respondem ao toque com elasticidade.",
+            "Seleção de lançamentos, agenda, metas e simulador de investimento também receberam animações."
+        ),
+        codename = "Fimbulwinter"
+    ),
+    ReleaseNote(
         "1.8.4", "Alertas com permissão segura",
         listOf(
             "Na primeira abertura, escolha se deseja ativar alertas de contas, faturas e orçamentos.",

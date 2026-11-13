@@ -1,5 +1,14 @@
 package com.japaneixxx.freya.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -10,6 +19,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -54,15 +64,29 @@ fun PlanScreen(vm: AppViewModel, section: Int, onSection: (Int) -> Unit) {
                 FilterChip(selected = section == i, onClick = { onSection(i) }, label = { Text(label) })
             }
         }
-        when (section) {
-            PlanSection.BUDGETS -> BudgetsSection(vm)
-            PlanSection.GOALS -> GoalsSection(vm)
-            PlanSection.COMMITMENTS -> CommitmentsSection(vm)
-            PlanSection.AGENDA -> AgendaSection(vm)
-            PlanSection.CARDS -> CardsSection(vm)
-            PlanSection.INSTALLMENTS -> InstallmentsSection(vm)
-            PlanSection.RECURRING -> RecurringSection(vm)
-            else -> ChargesSection(vm)
+        AnimatedContent(
+            targetState = section,
+            transitionSpec = {
+                val forward = targetState >= initialState
+                val enter = fadeIn(tween(240)) +
+                    slideInHorizontally(tween(300, easing = Motion.EaseOut)) { w -> if (forward) w / 10 else -w / 10 }
+                val exit = fadeOut(tween(140)) +
+                    slideOutHorizontally(tween(220, easing = Motion.EaseOut)) { w -> if (forward) -w / 16 else w / 16 }
+                enter togetherWith exit
+            },
+            label = "planSection",
+            modifier = Modifier.fillMaxSize()
+        ) { current ->
+            when (current) {
+                PlanSection.BUDGETS -> BudgetsSection(vm)
+                PlanSection.GOALS -> GoalsSection(vm)
+                PlanSection.COMMITMENTS -> CommitmentsSection(vm)
+                PlanSection.AGENDA -> AgendaSection(vm)
+                PlanSection.CARDS -> CardsSection(vm)
+                PlanSection.INSTALLMENTS -> InstallmentsSection(vm)
+                PlanSection.RECURRING -> RecurringSection(vm)
+                else -> ChargesSection(vm)
+            }
         }
     }
 }
@@ -88,11 +112,23 @@ private fun BudgetsSection(vm: AppViewModel) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         if (budgets.isNotEmpty()) item {
-            NCard(Modifier.fillMaxWidth(), container = MaterialTheme.colorScheme.primaryContainer) {
+            NCard(Modifier.fillMaxWidth().appear(0), container = MaterialTheme.colorScheme.primaryContainer) {
                 Text("Orçado em ${monthLabel(monthKey())}", style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onPrimaryContainer)
-                Text("${money(totalSpent)} de ${money(totalLimit)}", style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer)
+                Row(verticalAlignment = androidx.compose.ui.Alignment.Bottom) {
+                    AnimatedMoney(
+                        totalSpent,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Text(" de ", style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer)
+                    AnimatedMoney(
+                        totalLimit,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
                 val left = totalLimit - totalSpent
                 Text(
                     if (left >= 0) "Ainda disponível: ${money(left)}" else "Acima do orçado: ${money(-left)}",
@@ -124,8 +160,8 @@ private fun BudgetsSection(vm: AppViewModel) {
                 OutlinedButton(onClick = { vm.suggestBudgets() }) { Text("Sugerir") }
             }
         }
-        items(eff.sortedBy { it.category }, key = { it.category }) { b ->
-            NCard(Modifier.fillMaxWidth()) {
+        itemsIndexed(eff.sortedBy { it.category }, key = { _, b -> b.category }) { index, b ->
+            NCard(Modifier.fillMaxWidth().appear(index)) {
                 BudgetBar(b.category, spent[b.category] ?: 0.0, b.available) {
                     editing = budgets.firstOrNull { it.category == b.category }
                 }
@@ -209,23 +245,27 @@ private fun GoalsSection(vm: AppViewModel) {
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        items(goals, key = { it.id }) { g ->
+        itemsIndexed(goals, key = { _, g -> g.id }) { index, g ->
             val frac = if (g.target > 0) (g.saved / g.target).toFloat() else 0f
-            NCard(Modifier.fillMaxWidth()) {
+            val animatedFrac by animateFloatAsState(
+                targetValue = frac.coerceIn(0f, 1f),
+                animationSpec = tween(900, easing = Motion.EaseOut),
+                label = "goalProgress"
+            )
+            NCard(Modifier.fillMaxWidth().appear(index)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(g.name, style = MaterialTheme.typography.titleMedium)
-                    Text("${(frac * 100).roundToInt()}%", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
+                    Text("${(animatedFrac * 100).roundToInt()}%", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
                 }
                 Spacer(Modifier.height(8.dp))
-                LinearProgressIndicator(
-                    progress = { frac.coerceIn(0f, 1f) },
-                    color = if (frac >= 1f) IncomeColor else MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                    modifier = Modifier.fillMaxWidth().height(10.dp)
-                )
+                NProgress(frac, if (frac >= 1f) IncomeColor else MaterialTheme.colorScheme.primary, height = 10.dp)
                 Spacer(Modifier.height(6.dp))
                 Text("${money(g.saved)} de ${money(g.target)}", style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (frac >= 1f) {
+                    Text("🎉 Meta concluída!", style = MaterialTheme.typography.labelLarge, color = IncomeColor,
+                        modifier = Modifier.padding(top = 4.dp).pulse(minScale = 0.98f, maxScale = 1.02f))
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(onClick = { adjusting = g }) { Text("Guardar / retirar") }
                     TextButton(onClick = { vm.deleteGoal(g) }) { Text("Excluir") }
@@ -296,10 +336,10 @@ private fun RecurringSection(vm: AppViewModel) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            NCard(Modifier.fillMaxWidth(), container = MaterialTheme.colorScheme.secondaryContainer) {
+            NCard(Modifier.fillMaxWidth().appear(0), container = MaterialTheme.colorScheme.secondaryContainer) {
                 Text("Compromisso mensal fixo", style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSecondaryContainer)
-                Text(money(total), style = MaterialTheme.typography.headlineSmall,
+                AnimatedMoney(total, style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.onSecondaryContainer)
                 Text(
                     "Cobranças que se repetem todo mês, detectadas automaticamente no seu histórico.",
@@ -313,8 +353,8 @@ private fun RecurringSection(vm: AppViewModel) {
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        items(list, key = { it.name + it.lastDate }) { r ->
-            NCard(Modifier.fillMaxWidth()) {
+        itemsIndexed(list, key = { _, r -> r.name + r.lastDate }) { index, r ->
+            NCard(Modifier.fillMaxWidth().appear(index)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                     CategoryAvatar(r.category, 40.dp)
                     Spacer(Modifier.width(12.dp))
@@ -367,10 +407,13 @@ private fun CommitmentsSection(vm: AppViewModel) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            NCard(Modifier.fillMaxWidth(), container = MaterialTheme.colorScheme.primaryContainer) {
+            NCard(Modifier.fillMaxWidth().appear(0), container = MaterialTheme.colorScheme.primaryContainer) {
                 val c = MaterialTheme.colorScheme.onPrimaryContainer
                 Text("Compromissos de ${monthLabel(monthKey())}", style = MaterialTheme.typography.labelLarge, color = c)
-                Text("Falta pagar ${money(pendingTotal)}", style = MaterialTheme.typography.headlineSmall, color = c)
+                Row(verticalAlignment = androidx.compose.ui.Alignment.Bottom) {
+                    Text("Falta pagar ", style = MaterialTheme.typography.headlineSmall, color = c)
+                    AnimatedMoney(pendingTotal, style = MaterialTheme.typography.headlineSmall, color = c)
+                }
                 Text("Já pago: ${money(paidTotal)}", style = MaterialTheme.typography.bodySmall, color = c)
                 Spacer(Modifier.height(10.dp))
                 NProgress(frac, IncomeColor)
@@ -390,13 +433,14 @@ private fun CommitmentsSection(vm: AppViewModel) {
                 val list = bills.filter { (it.kind ?: KIND_FIXED) == kind }.sortedBy { it.dueDay }
                 if (list.isNotEmpty()) {
                     item(key = "h_$kind") { SectionTitle(title, Modifier.padding(top = 4.dp)) }
-                    items(list, key = { it.id }) { b ->
+                    itemsIndexed(list, key = { _, b -> b.id }) { index, b ->
                         CommitmentCard(
                             b, payments,
                             onToggle = { paid ->
                                 if (!paid && b.kind == KIND_VARIABLE) paying = b else vm.setBillPaid(b, !paid)
                             },
-                            onEdit = { editing = b }
+                            onEdit = { editing = b },
+                            modifier = Modifier.appear(index)
                         )
                     }
                 }
@@ -436,7 +480,13 @@ private fun CommitmentsSection(vm: AppViewModel) {
 }
 
 @Composable
-private fun CommitmentCard(b: Bill, payments: List<BillPayment>, onToggle: (paid: Boolean) -> Unit, onEdit: () -> Unit) {
+private fun CommitmentCard(
+    b: Bill,
+    payments: List<BillPayment>,
+    onToggle: (paid: Boolean) -> Unit,
+    onEdit: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     val ym = YearMonth.now()
     val active = isBillActive(b, ym)
     val paid = isPaid(b)
@@ -445,6 +495,12 @@ private fun CommitmentCard(b: Bill, payments: List<BillPayment>, onToggle: (paid
     val est = billEstimate(b, payments)
     val paidAmount = payments.firstOrNull { it.billId == b.id && it.month == monthKey() }?.amount
     val n = installmentNumber(b, ym)
+    val cardColor by animateColorAsState(
+        targetValue = if (paid) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f)
+        else MaterialTheme.colorScheme.surface,
+        animationSpec = tween(400, easing = Motion.EaseOut),
+        label = "commitmentPaid"
+    )
 
     val status = when {
         !active && n != null && n < 1 -> "Começa em ${monthLabel(b.firstMonth ?: monthKey())}"
@@ -454,7 +510,7 @@ private fun CommitmentCard(b: Bill, payments: List<BillPayment>, onToggle: (paid
         days == 0 -> "Vence hoje"
         else -> "Vence em $days dia(s) · dia ${b.dueDay}"
     }
-    NCard(Modifier.fillMaxWidth()) {
+    NCard(modifier.fillMaxWidth(), container = cardColor) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             KindAvatar(b.kind)
             Spacer(Modifier.width(12.dp))
@@ -630,10 +686,10 @@ private fun CardsSection(vm: AppViewModel) {
             Text("Nenhum cartão de crédito encontrado nas contas conectadas.",
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        items(cards, key = { it.id }) { c ->
+        itemsIndexed(cards, key = { _, c -> c.id }) { index, c ->
             val limit = c.creditLimit
             val used = if (limit != null && c.availableLimit != null) (limit - c.availableLimit).coerceAtLeast(0.0) else null
-            NCard(Modifier.fillMaxWidth()) {
+            NCard(Modifier.fillMaxWidth().appear(index)) {
                 Text(c.institution, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                     Text(c.name, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
@@ -653,11 +709,9 @@ private fun CardsSection(vm: AppViewModel) {
                 if (limit != null && used != null && limit > 0) {
                     Spacer(Modifier.height(10.dp))
                     val frac = (used / limit).toFloat()
-                    LinearProgressIndicator(
-                        progress = { frac.coerceIn(0f, 1f) },
-                        color = when { frac >= 0.9f -> ExpenseColor; frac >= 0.7f -> WarnColor; else -> MaterialTheme.colorScheme.primary },
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                        modifier = Modifier.fillMaxWidth().height(8.dp)
+                    NProgress(
+                        frac,
+                        when { frac >= 0.9f -> ExpenseColor; frac >= 0.7f -> WarnColor; else -> MaterialTheme.colorScheme.primary }
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
@@ -697,8 +751,8 @@ private fun InstallmentsSection(vm: AppViewModel) {
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        items(list, key = { it.name + it.total + it.lastDate }) { r ->
-            NCard(Modifier.fillMaxWidth()) {
+        itemsIndexed(list, key = { _, r -> r.name + r.total + r.lastDate }) { index, r ->
+            NCard(Modifier.fillMaxWidth().appear(index)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Column(Modifier.weight(1f)) {
                         Text(r.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
@@ -709,11 +763,7 @@ private fun InstallmentsSection(vm: AppViewModel) {
                     Text(money(r.amount), color = ExpenseColor, fontWeight = FontWeight.Medium)
                 }
                 Spacer(Modifier.height(8.dp))
-                LinearProgressIndicator(
-                    progress = { r.current.toFloat() / r.total },
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                    modifier = Modifier.fillMaxWidth().height(8.dp)
-                )
+                NProgress(r.current.toFloat() / r.total, MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.height(4.dp))
                 Text("Restam ${r.remaining} parcela(s): ${money(r.remainingAmount)}", style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -751,8 +801,8 @@ private fun ChargesSection(vm: AppViewModel) {
                 )
             }
         }
-        items(alerts, key = { it.key }) { a ->
-            NCard(Modifier.fillMaxWidth()) {
+        itemsIndexed(alerts, key = { _, a -> a.key }) { index, a ->
+            NCard(Modifier.fillMaxWidth().appear(index)) {
                 Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                     Text(if (a.isDuplicate) "⚠️" else "📈", style = MaterialTheme.typography.titleLarge)
                     Spacer(Modifier.width(10.dp))
@@ -804,10 +854,10 @@ private fun AgendaSection(vm: AppViewModel) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            NCard(Modifier.fillMaxWidth(), container = MaterialTheme.colorScheme.primaryContainer) {
+            NCard(Modifier.fillMaxWidth().appear(0), container = MaterialTheme.colorScheme.primaryContainer) {
                 val c = MaterialTheme.colorScheme.onPrimaryContainer
                 Text("Saldo previsto no fim do mês", style = MaterialTheme.typography.labelLarge, color = c)
-                Text(money(endBalance), style = MaterialTheme.typography.headlineSmall, color = c)
+                AnimatedMoney(endBalance, style = MaterialTheme.typography.headlineSmall, color = c)
                 Text(
                     "Hoje ${money(bank)} + receitas ${money(incomeLeft)} − compromissos ${money(outLeft)}",
                     style = MaterialTheme.typography.bodySmall, color = c
@@ -877,9 +927,9 @@ private fun AgendaSection(vm: AppViewModel) {
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        agenda.groupBy { it.date }.forEach { (date, events) ->
+        agenda.groupBy { it.date }.entries.forEachIndexed { index, (date, events) ->
             item(key = "d_$date") {
-                Column {
+                Column(Modifier.appear(index)) {
                     Text(
                         dayLabel(date.toString()), style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
