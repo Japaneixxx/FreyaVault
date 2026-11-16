@@ -23,6 +23,14 @@ data class ReleaseNote(
  */
 val releaseNotes: List<ReleaseNote> = listOf(
     ReleaseNote(
+        "1.8.6", "Base atualizada da versão",
+        listOf(
+            "Aplicativo ajustado para ficar em cima da versão mais nova.",
+            "Preparação de versão para manter atualização e publicação em dia."
+        ),
+        codename = "Fimbulwinter"
+    ),
+    ReleaseNote(
         "1.8.5", "Correção do calendário avulso",
         listOf(
             "Corrigido o toque no campo de data do recebimento avulso para abrir o calendário normalmente.",
