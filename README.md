@@ -16,6 +16,8 @@ investimentos diretamente no aparelho.
 - Categorias personalizadas e regras aprendidas a partir das alterações do usuário.
 - Planejamento com orçamentos, modo envelope, metas, compromissos, financiamentos,
   receitas previstas e agenda de 45 dias.
+- Frescor dos bancos: em Mais, o app mostra quando o Meu Pluggy leu os bancos pela última vez e tem um atalho
+  para abrir o Meu Pluggy; ao voltar, o Freya sincroniza sem esperar o intervalo mínimo.
 - Contas e cartões podem ser renomeados dentro do app (Mais > Contas ou Planejar > Cartões); o nome do banco
   não muda e o apelido sobrevive às sincronizações e entra no backup.
 - Recebimentos futuros podem ser recorrentes ou avulsos, para entradas únicas como freelances e bônus.
@@ -103,6 +105,9 @@ arquivo de backup em local seguro.
   [Japaneixxx/FreyaVault](https://github.com/Japaneixxx/FreyaVault).
 - Se houver um APK novo, o Android solicitará confirmação para instalar.
 - A opção fica em **Mais > Segurança e avisos** e vem ativada por padrão.
+- Versões **beta** (último dígito do Bug igual a 1, 3 ou 5, como `1.8.41`, `1.8.43` e `1.8.45`;
+  `x.x.5` é estável) são publicadas como pré-lançamento no GitHub e só aparecem quando você
+  toca em **Verificar atualizações**; a verificação automática ao abrir oferece só as estáveis.
 
 O histórico de versões fica em
 `app/src/main/java/com/japaneixxx/freya/ui/Changelog.kt`. Cada nova versão deve entrar no
@@ -122,7 +127,7 @@ Antes de publicar:
 4. Execute o build de debug e corrija erros de compilação.
 
 O workflow valida o formato da versão, executa `assembleRelease` e publica a tag
-`v<versionName>`.
+`v<versionName>`, marcando como pré-lançamento as versões beta.
 
 O repositório precisa dos seguintes GitHub Secrets:
 

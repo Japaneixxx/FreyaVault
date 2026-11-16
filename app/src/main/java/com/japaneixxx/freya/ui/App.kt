@@ -74,8 +74,14 @@ fun App(
     vm.updateRelease?.let { release ->
         AlertDialog(
             onDismissRequest = { vm.updateRelease = null },
-            title = { Text("Atualização disponível") },
-            text = { Text("A versão ${release.version} está disponível. O APK será baixado e o Android pedirá confirmação para instalar.") },
+            title = { Text(if (release.beta) "Versão beta disponível" else "Atualização disponível") },
+            text = {
+                Text(
+                    "A versão ${release.version}" + (if (release.beta) " (beta)" else "") +
+                        " está disponível. " + (if (release.beta) "Versões beta podem ter instabilidades. " else "") +
+                        "O APK será baixado e o Android pedirá confirmação para instalar."
+                )
+            },
             confirmButton = {
                 TextButton(onClick = {
                     vm.downloadUpdate(onInstallUpdate)

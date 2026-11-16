@@ -23,6 +23,22 @@ data class ReleaseNote(
  */
 val releaseNotes: List<ReleaseNote> = listOf(
     ReleaseNote(
+        "1.8.5", "Versões beta",
+        listOf(
+            "Versões beta (final 1, 3 ou 5 no número, como 1.8.41, 1.8.43 e 1.8.45) só aparecem ao tocar em Verificar atualizações.",
+            "A verificação automática ao abrir o app continua oferecendo apenas versões estáveis."
+        ),
+        codename = "Fimbulwinter"
+    ),
+    ReleaseNote(
+        "1.8.46", "Bancos mais frescos",
+        listOf(
+            "Em Mais, o Freya agora mostra quando o Meu Pluggy leu os bancos pela última vez e avisa quando passa de um dia.",
+            "Novo botão para abrir o Meu Pluggy e atualizar os bancos na hora; ao voltar, o Freya sincroniza sem esperar o intervalo mínimo."
+        ),
+        codename = "Fimbulwinter"
+    ),
+    ReleaseNote(
         "1.8.45", "Movimento e luz",
         listOf(
             "Transições suaves entre abas e seções, com entrada em cascata dos cartões.",

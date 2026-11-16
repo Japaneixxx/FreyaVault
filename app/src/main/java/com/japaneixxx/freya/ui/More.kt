@@ -160,12 +160,30 @@ fun MoreScreen(vm: AppViewModel) {
         SectionTitle("Dados")
         NCard(Modifier.fillMaxWidth()) {
             Text("Última sincronização: ${ago(vm.lastSync)}", style = MaterialTheme.typography.bodyMedium)
+            if (vm.bankUpdatedAt > 0L) {
+                val stale = System.currentTimeMillis() - vm.bankUpdatedAt > 30 * 60 * 60_000L
+                Text(
+                    "Bancos lidos pelo Meu Pluggy: ${ago(vm.bankUpdatedAt)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (stale) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                )
+                if (stale) Text(
+                    "Faz mais de um dia. Atualize pelo Meu Pluggy e sincronize em seguida.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error
+                )
+            }
             Text(
-                "O Meu Pluggy atualiza os bancos a cada ~24h; o app apenas busca o que já está lá.",
+                "O Meu Pluggy lê os bancos a cada ~24h e o Freya só busca o que já está lá. " +
+                    "Para forçar uma leitura nova, use Atualizar nos detalhes do banco no site do Meu Pluggy; " +
+                    "os bancos podem levar 1 a 2 minutos. Ao voltar, o Freya sincroniza sozinho.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(8.dp))
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedButton(onClick = {
+                    vm.markOpenedMeuPluggy()
+                    ctx.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://meu.pluggy.ai")))
+                }, modifier = Modifier.fillMaxWidth()) { Text("Abrir Meu Pluggy para atualizar os bancos") }
                 OutlinedButton(onClick = { showChangelog = true }, modifier = Modifier.fillMaxWidth()) {
                     Text("Novidades e histórico de versões (v${vm.currentVersion})")
                 }

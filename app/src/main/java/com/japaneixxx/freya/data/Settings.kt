@@ -30,6 +30,14 @@ class Settings(ctx: Context) {
         get() = prefs.getLong("last_sync", 0L)
         set(v) { prefs.edit().putLong("last_sync", v).apply() }
 
+    /** Quando o Meu Pluggy leu os bancos pela última vez (o mais antigo entre os itens), segundo o campo lastUpdatedAt. */
+    var bankUpdatedAt: Long
+        get() = prefs.getLong("bank_updated_at", 0L)
+        set(v) { prefs.edit().putLong("bank_updated_at", v).apply() }
+
+    /** Marcado ao abrir o site do Meu Pluggy: o próximo retorno ao app sincroniza sem esperar o intervalo mínimo. */
+    var syncOnReturn: Boolean get() = bool("sync_on_return"); set(v) = put("sync_on_return", v)
+
     var hideValues: Boolean get() = bool("hide"); set(v) = put("hide", v)
     var lockEnabled: Boolean get() = bool("lock"); set(v) = put("lock", v)
     val hasPin: Boolean get() = str("pin_hash").isNotBlank() && str("pin_salt").isNotBlank()

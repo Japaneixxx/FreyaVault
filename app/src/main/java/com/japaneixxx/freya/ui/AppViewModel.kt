@@ -117,6 +117,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     var syncing by mutableStateOf(false)
     var message by mutableStateOf<String?>(null)
     var lastSync by mutableStateOf(settings.lastSync)
+    var bankUpdatedAt by mutableStateOf(settings.bankUpdatedAt)
 
     var locked by mutableStateOf(settings.lockEnabled)
     var lockEnabled by mutableStateOf(settings.lockEnabled)
@@ -174,7 +175,14 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
 
     /** Chamado em onStart: sincroniza ao abrir o app, no máximo a cada 15 min. */
     fun syncIfStale() {
-        if (configured && System.currentTimeMillis() - settings.lastSync > 15 * 60_000L) sync()
+        val forced = settings.syncOnReturn
+        if (forced) settings.syncOnReturn = false
+        if (configured && (forced || System.currentTimeMillis() - settings.lastSync > 15 * 60_000L)) sync()
+    }
+
+    /** O usuário foi atualizar os bancos no site do Meu Pluggy: ao voltar, sincroniza sem esperar o intervalo mínimo. */
+    fun markOpenedMeuPluggy() {
+        settings.syncOnReturn = true
     }
 
     fun sync() {
@@ -184,6 +192,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
             try {
                 val warnings = Repository(settings, dao).sync()
                 lastSync = settings.lastSync
+                bankUpdatedAt = settings.bankUpdatedAt
                 val matched = withContext(Dispatchers.IO) { matchBillPayments() }
                 message = warnings.firstOrNull()
                     ?: if (matched > 0) "$matched conta(s) marcada(s) como paga(s) pelo extrato" else null
@@ -199,12 +208,13 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun checkForUpdate(showNoUpdate: Boolean = true) {
+    /** A verificação manual (`showNoUpdate = true`) também oferece versões beta; a automática só as estáveis. */
+    fun checkForUpdate(showNoUpdate: Boolean = true, includeBeta: Boolean = showNoUpdate) {
         if (!configured || checkingUpdate || downloadingUpdate) return
         viewModelScope.launch {
             checkingUpdate = true
             try {
-                updateRelease = Updater.check()
+                updateRelease = Updater.check(includeBeta)
                 if (showNoUpdate && updateRelease == null) {
                     message = "Você já está usando a versão mais recente"
                 }
@@ -521,6 +531,8 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
             aliases.value = emptyMap()
             settings.lastSync = 0L
             lastSync = 0L
+            settings.bankUpdatedAt = 0L
+            bankUpdatedAt = 0L
         }
     }
 }

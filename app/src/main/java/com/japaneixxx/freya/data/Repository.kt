@@ -13,12 +13,16 @@ class Repository(private val settings: Settings, private val dao: FinDao) {
         api.authenticate()
         val warnings = mutableListOf<String>()
         val allAccounts = mutableListOf<Account>()
+        val itemUpdates = mutableListOf<Long>()
 
         for (itemId in settings.itemList()) {
             var institution = "Banco"
             runCatching { api.item(itemId) }.onSuccess { item ->
                 val name = item.optJSONObject("connector")?.str("name").orEmpty()
                 if (name.isNotBlank()) institution = name
+                val updated = item.str("lastUpdatedAt").ifBlank { item.str("updatedAt") }
+                runCatching { java.time.OffsetDateTime.parse(updated).toInstant().toEpochMilli() }
+                    .onSuccess { itemUpdates += it }
                 val status = item.str("status")
                 if (status == "LOGIN_ERROR" || status == "OUTDATED") {
                     warnings += "$institution: reconecte no Meu Pluggy ($status)"
@@ -99,6 +103,8 @@ class Repository(private val settings: Settings, private val dao: FinDao) {
         dao.recordNetSnapshot()
         settings.widgetBank = bank
         settings.widgetCards = cards
+        // Mostra o dado mais antigo: é ele que diz o quão fresco está o conjunto de bancos.
+        itemUpdates.minOrNull()?.let { settings.bankUpdatedAt = it }
         settings.lastSync = System.currentTimeMillis()
         warnings
     }
