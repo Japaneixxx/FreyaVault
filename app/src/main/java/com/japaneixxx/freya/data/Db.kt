@@ -149,7 +149,10 @@ interface FinDao {
     // leituras pontuais (alertas em segundo plano e backup)
     @Query("SELECT * FROM accounts") suspend fun accountsNow(): List<Account>
     @Query("SELECT * FROM transactions") suspend fun txNow(): List<Tx>
-    @Query("SELECT * FROM transactions WHERE accountId = 'manual'") suspend fun manualTxNow(): List<Tx>
+    @Query("SELECT * FROM transactions WHERE accountId = 'manual' OR accountId LIKE 'cash:%'") suspend fun manualTxNow(): List<Tx>
+    @Query("SELECT * FROM accounts WHERE itemId = 'manual'") suspend fun cashAccountsNow(): List<Account>
+    @Query("SELECT * FROM snapshots") suspend fun snapshotsNow(): List<Snapshot>
+    @Query("SELECT * FROM net_snapshots") suspend fun netSnapshotsNow(): List<NetSnapshot>
     @Query("SELECT * FROM rules") suspend fun rulesNow(): List<Rule>
     @Query("SELECT * FROM budgets") suspend fun budgetsNow(): List<Budget>
     @Query("SELECT * FROM goals") suspend fun goalsNow(): List<Goal>
@@ -170,7 +173,7 @@ interface FinDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putBudget(b: Budget)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putGoal(g: Goal)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putMeta(m: TxMeta)
-    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putBill(b: Bill)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putBill(b: Bill): Long
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putSnapshot(s: Snapshot)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertInvestments(list: List<Investment>)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putNetItem(i: NetItem)
@@ -205,6 +208,23 @@ interface FinDao {
     @Query("DELETE FROM budgets WHERE category = :c") suspend fun deleteBudget(c: String)
     @Query("DELETE FROM goals WHERE id = :id") suspend fun deleteGoal(id: Long)
     @Query("DELETE FROM bills WHERE id = :id") suspend fun deleteBill(id: Long)
+
+    // conta de dinheiro físico (criada à mão): itemId = 'manual', id = 'cash:...'
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putAccount(a: Account)
+    @Query("UPDATE accounts SET balance = balance + :delta WHERE id = :id") suspend fun addToBalance(id: String, delta: Double)
+    @Query("UPDATE accounts SET balance = :balance WHERE id = :id") suspend fun setBalance(id: String, balance: Double)
+    @Query("DELETE FROM accounts WHERE id = :id") suspend fun deleteAccount(id: String)
+    @Query("DELETE FROM transactions WHERE accountId = :accountId") suspend fun deleteTxOfAccount(accountId: String)
+    @Query("DELETE FROM accounts WHERE itemId = 'manual'") suspend fun clearCashAccounts()
+    @Query("DELETE FROM transactions WHERE accountId = 'manual' OR accountId LIKE 'cash:%'") suspend fun clearManualTx()
+    @Query("SELECT * FROM transactions WHERE id = :id") suspend fun txById(id: String): Tx?
+
+    // limpeza de dados órfãos (itens removidos ou contas que sumiram do Pluggy)
+    @Query("DELETE FROM accounts WHERE itemId != 'manual' AND itemId NOT IN (:itemIds)") suspend fun deleteAccountsOfRemovedItems(itemIds: List<String>)
+    @Query("DELETE FROM investments WHERE itemId NOT IN (:itemIds)") suspend fun deleteInvestmentsOfRemovedItems(itemIds: List<String>)
+    @Query("DELETE FROM transactions WHERE accountId IN (SELECT id FROM accounts WHERE itemId != 'manual' AND itemId NOT IN (:itemIds))")
+    suspend fun deleteTxOfRemovedItems(itemIds: List<String>)
+    @Query("DELETE FROM accounts WHERE itemId = :itemId AND id NOT IN (:keep)") suspend fun deleteAccountsOfItemNotIn(itemId: String, keep: List<String>)
 
     @Query("DELETE FROM accounts") suspend fun clearAccounts()
     @Query("DELETE FROM transactions") suspend fun clearTx()
@@ -286,7 +306,7 @@ private val MIGRATION_4_5 = object : Migration(4, 5) {
     entities = [Account::class, Tx::class, Rule::class, Budget::class, Goal::class,
         TxMeta::class, Bill::class, Snapshot::class, Investment::class, NetItem::class,
         Envelope::class, NetSnapshot::class, BillPayment::class, Income::class, OneTimeIncome::class],
-    version = 6, exportSchema = false
+    version = 6, exportSchema = true
 )
 abstract class Db : RoomDatabase() {
     abstract fun dao(): FinDao

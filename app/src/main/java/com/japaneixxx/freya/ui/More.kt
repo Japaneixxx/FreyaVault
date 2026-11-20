@@ -33,13 +33,16 @@ import kotlinx.coroutines.withContext
 fun MoreScreen(vm: AppViewModel) {
     val accounts by vm.accounts.collectAsState()
     val rules by vm.rules.collectAsState()
-    val groups = remember(accounts) { accounts.groupBy { it.institution } }
+    val groups = remember(accounts) { accounts.filter { !com.japaneixxx.freya.data.isCashAccountId(it.id) }.groupBy { it.institution } }
     var renamingAccount by remember { mutableStateOf<com.japaneixxx.freya.data.Account?>(null) }
     var confirmWipe by remember { mutableStateOf(false) }
     var showRules by remember { mutableStateOf(false) }
     var showCats by remember { mutableStateOf(false) }
     var showChangelog by remember { mutableStateOf(false) }
     var showPinDialog by remember { mutableStateOf(false) }
+    var showExportDialog by remember { mutableStateOf(false) }
+    var exportPassword by remember { mutableStateOf<CharArray?>(null) }
+    var restoreText by remember { mutableStateOf<String?>(null) }
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -51,13 +54,15 @@ fun MoreScreen(vm: AppViewModel) {
     val backupExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         if (uri != null) scope.launch {
             runCatching {
-                val json = vm.backupJson()
+                val json = vm.backupJson(exportPassword)
                 withContext(Dispatchers.IO) {
                     val output = ctx.contentResolver.openOutputStream(uri)
                         ?: error("Não foi possível abrir o arquivo de backup")
                     output.use { it.write(json.toByteArray(Charsets.UTF_8)) }
                 }
-                vm.message = "Backup salvo"
+                vm.markBackupDone()
+                vm.message = if (exportPassword != null) "Backup salvo (criptografado)" else "Backup salvo"
+                exportPassword = null
             }.onFailure { vm.message = "Não foi possível salvar o backup" }
         }
     }
@@ -66,7 +71,7 @@ fun MoreScreen(vm: AppViewModel) {
             val text = runCatching {
                 ctx.contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) }
             }.getOrNull()
-            if (text != null) vm.restoreBackup(text) else vm.message = "Não foi possível ler o arquivo"
+            if (text != null) restoreText = text else vm.message = "Não foi possível ler o arquivo"
         }
     }
     val notifPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -107,6 +112,8 @@ fun MoreScreen(vm: AppViewModel) {
                 }
             }
         }
+
+        CashAccountsCard(vm)
 
         SectionTitle("Segurança e avisos")
         NCard(Modifier.fillMaxWidth()) {
@@ -216,12 +223,12 @@ fun MoreScreen(vm: AppViewModel) {
         SectionTitle("Backup")
         NCard(Modifier.fillMaxWidth()) {
             Text(
-                "Salva orçamentos, metas, contas a pagar, regras, notas e lançamentos manuais (o que não vem do banco).",
+                "Salva orçamentos, metas, contas a pagar, regras, notas, lançamentos manuais, contas de dinheiro, histórico dos gráficos e categorias próprias (o que não vem do banco). Pode ser protegido com senha.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { backupExporter.launch("freya-backup.json") }) { Text("Salvar backup") }
+                OutlinedButton(onClick = { showExportDialog = true }) { Text("Salvar backup") }
                 OutlinedButton(onClick = { backupImporter.launch(arrayOf("application/json", "*/*")) }) { Text("Restaurar") }
             }
             Spacer(Modifier.height(6.dp))
@@ -241,6 +248,18 @@ fun MoreScreen(vm: AppViewModel) {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
+
+    if (showExportDialog) {
+        ExportBackupDialog(
+            onChoose = { pass ->
+                exportPassword = pass
+                showExportDialog = false
+                backupExporter.launch("freya-backup.json")
+            },
+            onDismiss = { showExportDialog = false }
+        )
+    }
+    restoreText?.let { text -> RestoreBackupDialog(vm, text) { restoreText = null } }
 
     if (confirmWipe) {
         AlertDialog(

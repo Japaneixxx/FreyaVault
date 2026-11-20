@@ -153,10 +153,14 @@ fun SetupScreen(vm: AppViewModel) {
                     },
                     label = "onboardingStep"
                 ) { current ->
-                    if (current < last) StepContent(steps[current]) { url ->
-                        runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
-                            .onFailure { vm.setupError = "Não foi possível abrir o navegador." }
-                    } else FinalStep(vm)
+                    // O AnimatedContent empilha os filhos diretos no mesmo ponto (como um Box): sem esta Column,
+                    // emoji, título, texto e cartões ficavam uns em cima dos outros.
+                    Column(Modifier.fillMaxWidth()) {
+                        if (current < last) StepContent(steps[current]) { url ->
+                            runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+                                .onFailure { vm.setupError = "Não foi possível abrir o navegador." }
+                        } else FinalStep(vm)
+                    }
                 }
             }
 

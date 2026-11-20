@@ -24,8 +24,14 @@ class PluggyApi(private val clientId: String, private val clientSecret: String) 
         .readTimeout(40, TimeUnit.SECONDS)
         .build()
     private var apiKey: String = ""
+    private companion object { const val MAX_RETRIES = 3 }
 
-    private fun call(req: Request): JSONObject {
+    /** Erro HTTP do Pluggy; 429 e 5xx são temporários e disparam nova tentativa. */
+    class PluggyHttpException(val code: Int, message: String) : RuntimeException(message) {
+        val retryable: Boolean get() = code == 429 || code in 500..599
+    }
+
+    private fun callOnce(req: Request): JSONObject {
         http.newCall(req).execute().use { r ->
             val body = r.body?.string().orEmpty()
             if (!r.isSuccessful) {
@@ -35,9 +41,25 @@ class PluggyApi(private val clientId: String, private val clientSecret: String) 
                     404 -> " (confira o Item ID)"
                     else -> ""
                 }
-                throw RuntimeException("Pluggy ${r.code}: ${msg.ifBlank { body.take(120) }}$hint")
+                throw PluggyHttpException(r.code, "Pluggy ${r.code}: ${msg.ifBlank { body.take(120) }}$hint")
             }
             return JSONObject(body)
+        }
+    }
+
+    /** Até 3 novas tentativas (1s, 2s, 4s) em 429, 5xx e timeouts; demais erros sobem na hora. */
+    private fun call(req: Request): JSONObject {
+        var attempt = 0
+        while (true) {
+            try {
+                return callOnce(req)
+            } catch (e: PluggyHttpException) {
+                if (!e.retryable || attempt >= MAX_RETRIES) throw e
+            } catch (e: java.net.SocketTimeoutException) {
+                if (attempt >= MAX_RETRIES) throw e
+            }
+            Thread.sleep(1000L shl attempt)
+            attempt++
         }
     }
 

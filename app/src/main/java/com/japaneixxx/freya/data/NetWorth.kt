@@ -15,11 +15,11 @@ data class NetWorth(
 
 fun computeNetWorth(accounts: List<Account>, investments: List<Investment>, items: List<NetItem>): NetWorth =
     NetWorth(
-        bank = accounts.filter { it.type == "BANK" }.sumOf { it.balance },
-        investments = investments.sumOf { it.balance },
-        assets = items.filter { it.kind == "ASSET" }.sumOf { it.amount },
-        debts = items.filter { it.kind == "DEBT" }.sumOf { it.amount },
-        cards = accounts.filter { it.type == "CREDIT" }.sumOf { it.balance }
+        bank = bankTotal(accounts),
+        investments = investments.sumOf { it.balance }.r2(),
+        assets = items.filter { it.kind == "ASSET" }.sumOf { it.amount }.r2(),
+        debts = items.filter { it.kind == "DEBT" }.sumOf { it.amount }.r2(),
+        cards = cardsTotal(accounts)
     )
 
 /** Grava a foto do dia (a última do dia vence). */

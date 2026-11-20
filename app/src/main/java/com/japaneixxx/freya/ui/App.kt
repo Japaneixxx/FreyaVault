@@ -37,7 +37,7 @@ fun App(
         return
     }
     if (vm.locked) {
-        LockScreen(vm.pinEnabled, onUnlock) { vm.unlockWithPin(it) }
+        LockScreen(vm.pinEnabled, onUnlock, { vm.settings.pinLockRemainingMs() }) { vm.unlockWithPin(it) }
         return
     }
 
@@ -197,9 +197,17 @@ private fun NavIcon(icon: ImageVector, selected: Boolean) {
 }
 
 @Composable
-private fun LockScreen(hasPin: Boolean, onUnlock: () -> Unit, onPinUnlock: (String) -> Boolean) {
+private fun LockScreen(hasPin: Boolean, onUnlock: () -> Unit, pinWaitMs: () -> Long, onPinUnlock: (String) -> Boolean) {
     var pin by rememberSaveable { mutableStateOf("") }
     var pinError by rememberSaveable { mutableStateOf(false) }
+    // Depois de várias tentativas erradas o PIN trava por um tempo; contagem regressiva na tela.
+    var waitSecs by remember { mutableIntStateOf(((pinWaitMs() + 999) / 1000).toInt()) }
+    LaunchedEffect(waitSecs) {
+        if (waitSecs > 0) {
+            kotlinx.coroutines.delay(1000)
+            waitSecs = ((pinWaitMs() + 999) / 1000).toInt()
+        }
+    }
     LaunchedEffect(Unit) { onUnlock() }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
@@ -234,13 +242,20 @@ private fun LockScreen(hasPin: Boolean, onUnlock: () -> Unit, onPinUnlock: (Stri
                     ),
                     visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
                 )
-                if (pinError) {
+                if (waitSecs > 0) {
+                    Text("Muitas tentativas erradas. Tente de novo em ${waitSecs}s.",
+                        color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                } else if (pinError) {
                     Text("PIN incorreto", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 }
                 Spacer(Modifier.height(8.dp))
                 Button(
-                    onClick = { pinError = !onPinUnlock(pin) },
-                    enabled = pin.length == 4
+                    onClick = {
+                        pinError = !onPinUnlock(pin)
+                        waitSecs = ((pinWaitMs() + 999) / 1000).toInt()
+                        if (pinError) pin = ""
+                    },
+                    enabled = pin.length == 4 && waitSecs == 0
                 ) { Text("Entrar com PIN") }
             }
         }

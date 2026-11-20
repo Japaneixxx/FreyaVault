@@ -34,7 +34,6 @@ import com.japaneixxx.freya.data.Budget
 import com.japaneixxx.freya.data.Goal
 import java.time.LocalDate
 import java.time.YearMonth
-import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import kotlin.math.roundToInt
 
@@ -985,12 +984,8 @@ private fun OneTimeIncomeSheet(
     var name by remember { mutableStateOf(existing?.name ?: "Recebimento avulso") }
     var value by remember { mutableStateOf(existing?.amount?.let { "%.2f".format(it) } ?: "") }
     var date by remember { mutableStateOf(existing?.date ?: LocalDate.now().toString()) }
-    var showDatePicker by remember { mutableStateOf(false) }
     val amount = parseAmount(value)
     val validDate = runCatching { LocalDate.parse(date) }.getOrNull()
-    val datePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = validDate?.atStartOfDay(ZoneId.systemDefault())?.toInstant()?.toEpochMilli()
-    )
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(
             Modifier.padding(horizontal = 24.dp).padding(bottom = 32.dp).verticalScroll(rememberScrollState()),
@@ -1003,15 +998,7 @@ private fun OneTimeIncomeSheet(
                 value, { value = it }, label = { Text("Valor (R$)") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
             )
-            OutlinedTextField(
-                value = validDate?.let { dateBrLabel(it.toString()) } ?: date,
-                onValueChange = {},
-                label = { Text("Data do recebimento") },
-                singleLine = true,
-                readOnly = true,
-                modifier = Modifier.fillMaxWidth().clickable { showDatePicker = true },
-                isError = validDate == null
-            )
+            DateField(date, { date = it }, "Data do recebimento")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     enabled = name.isNotBlank() && amount != null && amount > 0 && validDate != null,
@@ -1021,25 +1008,6 @@ private fun OneTimeIncomeSheet(
                     }
                 ) { Text("Salvar") }
                 if (onDelete != null) OutlinedButton(onClick = { onDelete(); onDismiss() }) { Text("Excluir") }
-            }
-        }
-        if (showDatePicker) {
-            DatePickerDialog(
-                onDismissRequest = { showDatePicker = false },
-                confirmButton = {
-                    TextButton(onClick = {
-                        datePickerState.selectedDateMillis?.let {
-                            date = java.time.Instant.ofEpochMilli(it)
-                                .atZone(ZoneId.systemDefault()).toLocalDate().toString()
-                        }
-                        showDatePicker = false
-                    }) { Text("OK") }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showDatePicker = false }) { Text("Cancelar") }
-                }
-            ) {
-                DatePicker(state = datePickerState)
             }
         }
     }

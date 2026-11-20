@@ -8,7 +8,10 @@ import com.japaneixxx.freya.data.OneTimeIncome
 import com.japaneixxx.freya.data.Rule
 import com.japaneixxx.freya.data.Tx
 import com.japaneixxx.freya.data.TxMeta
+import com.japaneixxx.freya.data.CAT_OWN_TRANSFER
 import com.japaneixxx.freya.data.categorize
+import com.japaneixxx.freya.data.findOwnTransferPairs
+import com.japaneixxx.freya.data.legacyRuleKeyFor
 import com.japaneixxx.freya.data.ruleKeyFor
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -102,9 +105,16 @@ fun detectRecurring(txs: List<TxItem>): List<Recurring> {
 fun buildItems(txs: List<Tx>, rules: List<Rule>, metas: List<TxMeta>): List<TxItem> {
     val ruleMap = rules.associate { it.ruleKey to it.category }
     val metaMap = metas.associateBy { it.txId }
+    // Transferências entre contas próprias (saída numa, entrada noutra) não são despesa nem receita.
+    // Quem já tem categoria escolhida pelo usuário fica como está.
+    val userChosen = if (ruleMap.isEmpty()) emptySet() else txs
+        .filter { ruleMap.containsKey(ruleKeyFor(it)) || ruleMap.containsKey(legacyRuleKeyFor(it)) }
+        .map { it.id }.toSet()
+    val ownTransfers = findOwnTransferPairs(txs, userChosen)
     return txs.map {
         val m = metaMap[it.id]
-        TxItem(it, categorize(it, ruleMap), m?.note.orEmpty(), m?.ignored ?: false)
+        val category = if (it.id in ownTransfers) CAT_OWN_TRANSFER else categorize(it, ruleMap)
+        TxItem(it, category, m?.note.orEmpty(), m?.ignored ?: false)
     }
 }
 

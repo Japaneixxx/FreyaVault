@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.room.withTransaction
 import java.net.UnknownHostException
 import java.util.Locale
 import java.util.UUID
@@ -26,22 +27,10 @@ import java.time.YearMonth
 import kotlin.math.abs
 import kotlinx.coroutines.flow.MutableStateFlow
 
-data class TxItem(
-    val tx: Tx,
-    val category: String,
-    val note: String = "",
-    val metaIgnored: Boolean = false
-) {
-    val ignored: Boolean get() = metaIgnored || category in IGNORED_CATEGORIES
-    val manual: Boolean get() = tx.accountId == "manual"
-
-    /** Nome sem texto redundante do banco + tipo (Pix, débito, fatura...) como sinalização. */
-    val clean: Clean by lazy(LazyThreadSafetyMode.NONE) { sanitize(tx.description, tx.amount) }
-}
-
 class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     val settings = Settings(app)
-    private val dao = Db.get(app).dao()
+    private val db = Db.get(app)
+    private val dao = db.dao()
 
     init {
         Privacy.hidden = settings.hideValues
@@ -103,6 +92,15 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
             // versão sem entrada no histórico (ex.: só correção): não incomoda o usuário
             notesSince(seen, currentVersion).isEmpty() -> settings.lastSeenVersion = currentVersion
             else -> whatsNewFrom = seen
+        }
+    }
+
+    init {
+        // Tudo é local: sem backup, trocar de celular zera tudo. Lembra a cada 30 dias (conta a partir do 1º uso).
+        val now = System.currentTimeMillis()
+        if (settings.lastBackupAt == 0L) settings.lastBackupAt = now
+        else if (settings.configured && now - settings.lastBackupAt > 30L * 24 * 60 * 60 * 1000) {
+            message = "Faz mais de 30 dias do último backup. Faça um em Mais > Backup."
         }
     }
 
@@ -190,12 +188,13 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             syncing = true
             try {
-                val warnings = Repository(settings, dao).sync()
+                val warnings = Repository(settings, db).sync()
                 lastSync = settings.lastSync
                 bankUpdatedAt = settings.bankUpdatedAt
                 val matched = withContext(Dispatchers.IO) { matchBillPayments() }
-                message = warnings.firstOrNull()
+                message = warnings.takeIf { it.isNotEmpty() }?.take(3)?.joinToString("\n")
                     ?: if (matched > 0) "$matched conta(s) marcada(s) como paga(s) pelo extrato" else null
+                withContext(Dispatchers.IO) { settings.pruneSeen() }
                 BalanceWidget.refresh(app)
                 Alerts.check(app)
             } catch (e: UnknownHostException) {
@@ -210,7 +209,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
 
     /** A verificação manual (`showNoUpdate = true`) também oferece versões beta; a automática só as estáveis. */
     fun checkForUpdate(showNoUpdate: Boolean = true, includeBeta: Boolean = showNoUpdate) {
-        if (!configured || checkingUpdate || downloadingUpdate) return
+        if (checkingUpdate || downloadingUpdate) return
         viewModelScope.launch {
             checkingUpdate = true
             try {
@@ -265,6 +264,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
         if (!Biometric.available(app) && lockEnabled) setLock(false)
     }
 
+    /** Falso se o PIN estiver errado ou se houver espera por tentativas erradas (a tela de bloqueio mostra o tempo). */
     fun unlockWithPin(pin: String): Boolean {
         if (!settings.verifyPin(pin)) return false
         locked = false
@@ -334,19 +334,95 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { dao.putMeta(TxMeta(item.tx.id, item.note, ignored)) }
     }
 
-    fun addManual(description: String, amount: Double, date: String, category: String) {
+    /** [accountId] = id de uma conta de dinheiro (cash:...) ou o padrão "manual" (lançamento sem conta). */
+    fun addManual(description: String, amount: Double, date: String, category: String, accountId: String = MANUAL_ACCOUNT_ID) {
         viewModelScope.launch {
-            dao.putTx(
-                Tx(
-                    id = "manual-" + UUID.randomUUID(), accountId = "manual", date = date,
-                    description = description, amount = amount, pluggyCategory = category, pending = false
+            val prefix = if (isCashAccountId(accountId)) "cash-" else "manual-"
+            db.withTransaction {
+                dao.putTx(
+                    Tx(
+                        id = prefix + UUID.randomUUID(), accountId = accountId, date = date,
+                        description = description, amount = amount, pluggyCategory = category, pending = false
+                    )
                 )
-            )
+                // O saldo da conta de dinheiro acompanha os lançamentos dela.
+                if (isCashAccountId(accountId)) dao.addToBalance(accountId, amount)
+            }
+            if (isCashAccountId(accountId)) refreshTotals()
         }
     }
 
     fun deleteManual(tx: Tx) {
-        if (tx.accountId == "manual") viewModelScope.launch { dao.deleteTx(tx.id) }
+        if (!isManualAccountId(tx.accountId)) return
+        viewModelScope.launch {
+            db.withTransaction {
+                dao.deleteTx(tx.id)
+                if (isCashAccountId(tx.accountId)) dao.addToBalance(tx.accountId, -tx.amount)
+            }
+            if (isCashAccountId(tx.accountId)) refreshTotals()
+        }
+    }
+
+    // ----- dinheiro físico (conta criada à mão) -----
+    val cashAccounts get() = accounts.value.filter { isCashAccountId(it.id) }
+
+    fun addCashAccount(name: String, initialBalance: Double) {
+        val n = name.trim().ifBlank { "Carteira" }
+        viewModelScope.launch {
+            db.withTransaction {
+                dao.putAccount(
+                    Account(
+                        id = CASH_PREFIX + UUID.randomUUID(), itemId = MANUAL_ITEM_ID, institution = "Dinheiro",
+                        name = n, type = "BANK", subtype = "CASH", balance = initialBalance.r2(), currency = "BRL"
+                    )
+                )
+            }
+            refreshTotals()
+        }
+    }
+
+    /** Acerta o saldo com o que o usuário realmente tem na mão, registrando a diferença como ajuste (fora dos totais). */
+    fun adjustCashBalance(accountId: String, realBalance: Double) {
+        val current = rawAccounts.value.firstOrNull { it.id == accountId } ?: return
+        val delta = (realBalance - current.balance).r2()
+        if (delta == 0.0) return
+        viewModelScope.launch {
+            db.withTransaction {
+                dao.putTx(
+                    Tx(
+                        id = "cash-adj-" + UUID.randomUUID(), accountId = accountId, date = java.time.LocalDate.now().toString(),
+                        description = "Ajuste de saldo", amount = delta, pluggyCategory = CAT_OWN_TRANSFER, pending = false
+                    )
+                )
+                dao.setBalance(accountId, realBalance.r2())
+            }
+            refreshTotals()
+        }
+    }
+
+    fun deleteCashAccount(accountId: String) {
+        if (!isCashAccountId(accountId)) return
+        viewModelScope.launch {
+            db.withTransaction {
+                dao.deleteTxOfAccount(accountId)
+                dao.deleteAccount(accountId)
+            }
+            renameAccount(accountId, null)
+            refreshTotals()
+        }
+    }
+
+    /** Recalcula patrimônio, foto do dia e widget depois de mudar saldos fora do sync. */
+    private suspend fun refreshTotals() {
+        withContext(Dispatchers.IO) {
+            val all = dao.accountsNow()
+            val bank = bankTotal(all); val cards = cardsTotal(all)
+            settings.widgetBank = bank
+            settings.widgetCards = cards
+            dao.putSnapshot(Snapshot(java.time.LocalDate.now().toString(), bank, cards))
+            dao.recordNetSnapshot()
+        }
+        BalanceWidget.refresh(app)
     }
 
     // ----- orçamentos -----
@@ -499,20 +575,46 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
         return sb.toString()
     }
 
-    suspend fun backupJson(): String = withContext(Dispatchers.IO) { Backup.export(dao, settings.accountAliases()) }
+    /** Gera o backup; com [password] o arquivo sai criptografado (AES-256-GCM). */
+    suspend fun backupJson(password: CharArray? = null): String = withContext(Dispatchers.IO) {
+        val plain = Backup.export(dao, settings.accountAliases(), Cats.custom)
+        if (password != null && password.isNotEmpty()) BackupCrypto.encrypt(plain, password) else plain
+    }
 
-    fun restoreBackup(json: String) {
+    fun markBackupDone() { settings.lastBackupAt = System.currentTimeMillis() }
+
+    fun isBackupEncrypted(text: String): Boolean = BackupCrypto.isEncrypted(text)
+
+    /** [replace] troca os dados do backup pelos dele; false mescla sem sobrescrever nem duplicar. */
+    fun restoreBackup(json: String, replace: Boolean = false, password: CharArray? = null) {
         viewModelScope.launch {
             message = try {
                 val n = withContext(Dispatchers.IO) {
-                    Backup.import(dao, json) { restored ->
-                        settings.mergeAccountAliases(restored)
-                        aliases.value = settings.accountAliases()
-                    }
+                    val plain = if (BackupCrypto.isEncrypted(json)) {
+                        if (password == null) throw BadBackupPasswordException()
+                        BackupCrypto.decrypt(json, password)
+                    } else json
+                    Backup.import(dao, { block -> db.withTransaction { block() } }, plain, replace,
+                        onAccountAliases = { restored ->
+                            settings.mergeAccountAliases(restored)
+                            aliases.value = settings.accountAliases()
+                        },
+                        onCustomCategories = { list ->
+                            val merged = (Cats.custom + list).distinct()
+                            settings.customCategories = merged.joinToString("|")
+                            Cats.custom = merged
+                        })
                 }
+                refreshTotals()
                 "Backup restaurado ($n itens)"
-            } catch (e: Exception) {
+            } catch (e: BadBackupPasswordException) {
+                e.message
+            } catch (e: IllegalArgumentException) {
+                e.message ?: "Backup incompatível"
+            } catch (e: org.json.JSONException) {
                 "Arquivo de backup inválido"
+            } catch (e: Exception) {
+                "Não foi possível restaurar o backup (${e.message ?: e.javaClass.simpleName}). Nada foi alterado."
             }
         }
     }

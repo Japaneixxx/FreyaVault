@@ -29,6 +29,7 @@
 - Antes de concluir qualquer mudança que será publicada, incremente `versionCode` e atualize `versionName` no formato `Major.Minor.Bug` (por exemplo, `1.2.0`).
 - Atualize `versionCode` e `versionName` em `app/build.gradle.kts` juntos; o `versionCode` deve sempre aumentar.
 - Ao subir a versão, adicione também a entrada correspondente no topo de `releaseNotes` em `app/src/main/java/com/japaneixxx/freya/ui/Changelog.kt`; ela alimenta o menu "Novidades" e o aviso automático após atualizar.
+- Versão beta = o último número (Bug) tem 2 ou mais dígitos (ex.: `1.8.51`); com 1 dígito é estável (ex.: `1.9.0`). Betas levam o número da estável anterior mais um dígito.
 - O workflow valida `versionName` e publica a Release com a tag `v<Major>.<Minor>.<Bug>`.
 - Use `push` para `main` ou `master` somente quando quiser disparar a publicação automática do APK.
 - Releases devem usar o keystore permanente configurado pelos secrets do GitHub; nunca crie ou versione chaves de assinatura no repositório.

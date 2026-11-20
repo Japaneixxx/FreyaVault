@@ -30,13 +30,14 @@ android {
         applicationId = "com.japaneixxx.freya"
         minSdk = 26
         targetSdk = 34
-        versionCode = 23
-        versionName = "1.8.5"
+        versionCode = 24
+        versionName = "1.9.0"
     }
 
     buildTypes {
         release {
             isMinifyEnabled = true
+            isShrinkResources = true
             signingConfig = signingConfigs.getByName("release")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
@@ -51,6 +52,11 @@ android {
         buildConfig = true
     }
     composeOptions { kotlinCompilerExtensionVersion = "1.5.14" }
+}
+
+// Exporta o schema do Room (app/schemas): base para testar migrações nas próximas versões do banco.
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {
@@ -75,4 +81,8 @@ dependencies {
     implementation("com.google.errorprone:error_prone_annotations:2.26.1")
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.work:work-runtime-ktx:2.9.0")
+
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
+    testImplementation("org.json:json:20240303") // o org.json do android.jar é só um stub nos testes
 }

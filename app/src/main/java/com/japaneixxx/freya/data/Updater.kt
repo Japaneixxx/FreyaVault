@@ -15,7 +15,11 @@ data class UpdateRelease(
     val version: String,
     val downloadUrl: String,
     val fileName: String,
-    val beta: Boolean = false
+    val beta: Boolean = false,
+    /** SHA-256 esperado do APK (hex), quando a Release informa; null = sem como verificar. */
+    val sha256: String? = null,
+    /** Arquivo "<apk>.sha256" da Release, usado quando o GitHub não informa o digest do asset. */
+    val sha256Url: String? = null
 )
 
 object Updater {
@@ -25,14 +29,7 @@ object Updater {
         "https://api.github.com/repos/Japaneixxx/FreyaVault/releases?per_page=30"
     private val client = OkHttpClient()
 
-    /**
-     * Versão beta: o último dígito do Bug é 1, 3 ou 5 (ex.: 1.8.41, 1.8.43, 1.8.45).
-     * A exceção é x.x.5 (Bug exatamente 5), que é estável.
-     */
-    fun isBeta(version: String): Boolean {
-        val bug = version.split("-", limit = 2).first().split(".").getOrNull(2)?.toIntOrNull() ?: return false
-        return bug != 5 && bug % 10 in setOf(1, 3, 5)
-    }
+    fun isBeta(version: String): Boolean = Versions.isBeta(version)
 
     /**
      * Verifica se há versão nova. Automático (`includeBeta = false`) usa só a Release estável mais recente;
@@ -78,11 +75,21 @@ object Updater {
         val name = apk.optString("name")
         if (version.isBlank() || url.isBlank() || name.isBlank()) return null
         if (!isNewer(version, BuildConfig.VERSION_NAME)) return null
-        return UpdateRelease(version, url, name, beta = json.optBoolean("prerelease") || isBeta(version))
+        // O GitHub devolve "digest": "sha256:<hex>" nos assets; senão procura o arquivo .sha256 publicado junto.
+        val digest = apk.optString("digest").removePrefix("sha256:").takeIf { it.length == 64 }?.lowercase()
+        val shaUrl = json.optJSONArray("assets")?.let { assets ->
+            (0 until assets.length()).map { assets.getJSONObject(it) }
+                .firstOrNull { it.optString("name").equals("$name.sha256", ignoreCase = true) }
+                ?.optString("browser_download_url")?.takeIf { it.isNotBlank() }
+        }
+        return UpdateRelease(version, url, name, beta = json.optBoolean("prerelease") || isBeta(version),
+            sha256 = digest, sha256Url = shaUrl)
     }
 
+    /** Baixa o APK, confere o SHA-256 (quando a Release informa) e apaga APKs antigos do cache. */
     suspend fun download(context: Context, release: UpdateRelease): android.net.Uri =
         withContext(Dispatchers.IO) {
+            context.cacheDir.listFiles { f -> f.name.endsWith(".apk", ignoreCase = true) }?.forEach { it.delete() }
             val destination = File(context.cacheDir, release.fileName)
             val request = Request.Builder().url(release.downloadUrl).build()
             client.newCall(request).execute().use { response ->
@@ -91,19 +98,36 @@ object Updater {
                     destination.outputStream().use { output -> input.copyTo(output) }
                 } ?: error("GitHub não retornou o APK")
             }
+            val expected = release.sha256 ?: release.sha256Url?.let { fetchExpectedSha(it) }
+            if (expected != null) {
+                val actual = sha256Of(destination)
+                if (!actual.equals(expected, ignoreCase = true)) {
+                    destination.delete()
+                    error("O APK baixado não confere com o hash publicado (SHA-256). Atualização cancelada por segurança.")
+                }
+            }
             FileProvider.getUriForFile(context, "${BuildConfig.APPLICATION_ID}.fileprovider", destination)
         }
 
-    private fun isNewer(candidate: String, current: String): Boolean {
-        fun parts(value: String) = value.split("-", limit = 2).first()
-            .split(".").map { it.toIntOrNull() ?: 0 }
-        val newParts = parts(candidate)
-        val currentParts = parts(current)
-        for (i in 0 until maxOf(newParts.size, currentParts.size)) {
-            val newer = newParts.getOrElse(i) { 0 }
-            val existing = currentParts.getOrElse(i) { 0 }
-            if (newer != existing) return newer > existing
+    private fun fetchExpectedSha(url: String): String? = runCatching {
+        client.newCall(Request.Builder().url(url).build()).execute().use { r ->
+            if (!r.isSuccessful) null
+            else r.body?.string().orEmpty().trim().split(Regex("\\s+")).firstOrNull()?.takeIf { it.length == 64 }
         }
-        return false
+    }.getOrNull()
+
+    private fun sha256Of(file: File): String {
+        val md = java.security.MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buf = ByteArray(64 * 1024)
+            while (true) {
+                val n = input.read(buf)
+                if (n < 0) break
+                md.update(buf, 0, n)
+            }
+        }
+        return md.digest().joinToString("") { "%02x".format(it) }
     }
+
+    private fun isNewer(candidate: String, current: String): Boolean = Versions.isNewer(candidate, current)
 }

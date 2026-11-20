@@ -23,6 +23,22 @@ data class ReleaseNote(
  */
 val releaseNotes: List<ReleaseNote> = listOf(
     ReleaseNote(
+        "1.9.0", "Dinheiro físico e dados mais seguros",
+        listOf(
+            "Nova conta de dinheiro físico em Mais: crie uma carteira, registre entradas e saídas pelo + do Extrato escolhendo a conta, e ajuste o saldo quando quiser. O saldo entra no total e no patrimônio.",
+            "Corrigido: o calendário dos recebimentos avulsos não abria ao tocar na data (e a data escolhida podia ficar um dia antes). O Extrato também ganhou o calendário.",
+            "Sincronização mais confiável: se um banco falha, os outros continuam e o aviso diz qual foi; cada banco é gravado por inteiro ou nada; bancos removidos não somam mais no patrimônio; novas tentativas automáticas quando o Pluggy está instável.",
+            "Backup melhorado: inclui histórico dos gráficos, categorias próprias e contas de dinheiro; pode ser protegido com senha (AES-256); restaura com Mesclar ou Substituir e, se algo falhar, nada é alterado. O app lembra a cada 30 dias de fazer um backup.",
+            "Segurança: o PIN agora usa hash lento e trava por um tempo após 5 erros; valores e bloqueio ligados escondem o app de capturas de tela e dos apps recentes; o app não trava mais se o armazenamento seguro do aparelho corromper.",
+            "Atualizações: o APK baixado é conferido pelo SHA-256 publicado na Release, e a verificação funciona mesmo antes de configurar o Pluggy.",
+            "Categorias: palavras-chave só casam no início de palavras (acabou \"uber\" dentro de \"tuberculose\"), Mercado Livre vira Compras e categorias do Pluggy em inglês não aparecem mais.",
+            "Transferências entre suas próprias contas (Pix/TED de mesmo valor, até 1 dia de diferença) são reconhecidas e não contam como despesa e receita. Se errar, escolha a categoria à mão no lançamento.",
+            "Somas em moeda estrangeira não viram reais, e os totais são arredondados em centavos.",
+            "Corrigido: a tela de tutorial inicial mostrava os textos e cartões uns em cima dos outros."
+        ),
+        codename = "Fimbulwinter"
+    ),
+    ReleaseNote(
         "1.8.5", "Versões beta",
         listOf(
             "Versões beta (final 1, 3 ou 5 no número, como 1.8.41, 1.8.43 e 1.8.45) só aparecem ao tocar em Verificar atualizações.",

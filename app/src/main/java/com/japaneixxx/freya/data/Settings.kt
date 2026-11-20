@@ -1,21 +1,37 @@
 package com.japaneixxx.freya.data
 
 import android.content.Context
-import android.util.Base64
+import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
-import java.security.MessageDigest
-import java.security.SecureRandom
+import java.time.LocalDate
+import java.util.Base64
 
 /** Credenciais e preferências ficam criptografadas (Android Keystore) no próprio aparelho. */
 class Settings(ctx: Context) {
-    private val prefs = EncryptedSharedPreferences.create(
-        ctx,
-        "secure_settings",
-        MasterKey.Builder(ctx).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
-        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-    )
+    private val prefs: SharedPreferences = openPrefs(ctx)
+
+    private companion object {
+        fun create(ctx: Context): SharedPreferences = EncryptedSharedPreferences.create(
+            ctx,
+            "secure_settings",
+            MasterKey.Builder(ctx).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+
+        /**
+         * Em alguns aparelhos o Keystore corrompe (restauração de backup do sistema, troca de bloqueio de tela) e o
+         * arquivo criptografado fica ilegível: o app travaria já na abertura. Nesse caso recomeça com preferências
+         * limpas (será preciso informar o Pluggy de novo; os dados do banco local continuam).
+         */
+        fun openPrefs(ctx: Context): SharedPreferences = try {
+            create(ctx)
+        } catch (e: Exception) {
+            ctx.deleteSharedPreferences("secure_settings")
+            create(ctx)
+        }
+    }
 
     private fun str(key: String) = prefs.getString(key, "") ?: ""
     private fun put(key: String, v: String) = prefs.edit().putString(key, v).apply()
@@ -97,25 +113,44 @@ class Settings(ctx: Context) {
     fun clearAccountAliases() = saveAccountAliases(emptyMap())
 
     fun setPin(pin: String) {
-        val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
-        put("pin_salt", Base64.encodeToString(salt, Base64.NO_WRAP))
-        put("pin_hash", hashPin(pin, salt))
+        val salt = PinHasher.newSalt()
+        prefs.edit()
+            .putString("pin_salt", Base64.getEncoder().encodeToString(salt))
+            .putString("pin_hash", PinHasher.pbkdf2(pin, salt))
+            .putString("pin_v", "2")
+            .putInt("pin_fails", 0)
+            .putLong("pin_lock_until", 0L)
+            .apply()
     }
 
     fun clearPin() {
-        prefs.edit().remove("pin_hash").remove("pin_salt").apply()
+        prefs.edit().remove("pin_hash").remove("pin_salt").remove("pin_v")
+            .remove("pin_fails").remove("pin_lock_until").apply()
     }
+
+    /** Milissegundos que ainda faltam até poder tentar o PIN de novo (0 = liberado). */
+    fun pinLockRemainingMs(): Long =
+        (prefs.getLong("pin_lock_until", 0L) - System.currentTimeMillis()).coerceAtLeast(0L)
 
     fun verifyPin(pin: String): Boolean {
-        val salt = runCatching { Base64.decode(str("pin_salt"), Base64.NO_WRAP) }.getOrNull() ?: return false
+        if (pinLockRemainingMs() > 0) return false
+        val salt = runCatching { Base64.getDecoder().decode(str("pin_salt")) }.getOrNull() ?: return false
         val expected = str("pin_hash")
         if (expected.isBlank()) return false
-        return MessageDigest.isEqual(hashPin(pin, salt).toByteArray(), expected.toByteArray())
-    }
-
-    private fun hashPin(pin: String, salt: ByteArray): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        return Base64.encodeToString(digest.digest(salt + pin.toByteArray(Charsets.UTF_8)), Base64.NO_WRAP)
+        val v2 = str("pin_v") == "2"
+        val ok = PinHasher.same(
+            if (v2) PinHasher.pbkdf2(pin, salt) else PinHasher.legacySha256(pin, salt),
+            expected
+        )
+        if (ok) {
+            if (!v2) setPin(pin) // migra o PIN antigo (SHA-256) para PBKDF2
+            prefs.edit().putInt("pin_fails", 0).putLong("pin_lock_until", 0L).apply()
+        } else {
+            val fails = prefs.getInt("pin_fails", 0) + 1
+            val until = PinHasher.lockDelayMs(fails).let { if (it > 0) System.currentTimeMillis() + it else 0L }
+            prefs.edit().putInt("pin_fails", fails).putLong("pin_lock_until", until).apply()
+        }
+        return ok
     }
 
     // usados pelo widget
@@ -133,6 +168,29 @@ class Settings(ctx: Context) {
 
     fun seen(key: String): Boolean = bool("seen_$key")
     fun markSeen(key: String) = put("seen_$key", true)
+
+    /** Último backup exportado (0 = nunca); base do lembrete mensal. */
+    var lastBackupAt: Long
+        get() = prefs.getLong("last_backup_at", 0L)
+        set(v) { prefs.edit().putLong("last_backup_at", v).apply() }
+
+    /**
+     * Cada alerta marcado como visto vira uma chave para sempre. Apaga as que carregam uma data com mais de
+     * [keepDays] dias (já não podem repetir). Escolhas do usuário ("dismiss_") e alertas de cobrança ficam.
+     */
+    fun pruneSeen(today: LocalDate = LocalDate.now(), keepDays: Long = 120) {
+        val cutoff = today.minusDays(keepDays)
+        val date = Regex("""(\d{4})-(\d{2})(?:-(\d{2}))?""")
+        val old = prefs.all.keys.filter { k ->
+            k.startsWith("seen_") && !k.startsWith("seen_dismiss_") && !k.startsWith("seen_chg_") &&
+                date.find(k)?.let { m ->
+                    runCatching {
+                        LocalDate.of(m.groupValues[1].toInt(), m.groupValues[2].toInt(), m.groupValues[3].toIntOrNull() ?: 1)
+                    }.getOrNull()?.isBefore(cutoff) == true
+                } == true
+        }
+        if (old.isNotEmpty()) prefs.edit().apply { old.forEach { remove(it) } }.apply()
+    }
 
     val configured: Boolean
         get() = clientId.isNotBlank() && clientSecret.isNotBlank() && itemList().isNotEmpty()

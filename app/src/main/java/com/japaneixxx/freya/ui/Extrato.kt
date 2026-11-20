@@ -15,6 +15,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -64,7 +65,7 @@ fun ExtratoScreen(vm: AppViewModel) {
     val list = remember(txs, query, type, month, category, accountLabel, sort) {
         val base = txs.filter {
             (accountLabel == "Todas as contas" ||
-                (accountLabel == "Manual" && it.manual) ||
+                (accountLabel == "Manual" && it.tx.accountId == com.japaneixxx.freya.data.MANUAL_ACCOUNT_ID) ||
                 accLabels[it.tx.accountId] == accountLabel) &&
                 (month == null || it.tx.date.startsWith(month!!)) &&
                 (category == null || it.category == category) &&
@@ -348,7 +349,7 @@ private fun TxRow(
                 )
                 KindPills(item.clean.kind, item.clean.parcel)
                 if (tx.pending) Pill("pendente")
-                if (item.manual) Pill("manual")
+                if (item.manual) Pill(if (com.japaneixxx.freya.data.isCashAccountId(item.tx.accountId)) "dinheiro" else "manual")
                 if (item.metaIgnored) Pill("ignorada")
                 if (item.note.isNotBlank()) Text("📝", fontSize = 11.sp)
             }
@@ -459,6 +460,9 @@ fun AddSheet(vm: AppViewModel, onClose: () -> Unit) {
     var expense by remember { mutableStateOf(true) }
     var cat by remember { mutableStateOf("Outros") }
     var date by remember { mutableStateOf(LocalDate.now().toString()) }
+    val accounts by vm.accounts.collectAsState()
+    val cashList = remember(accounts) { accounts.filter { com.japaneixxx.freya.data.isCashAccountId(it.id) } }
+    var accountId by remember { mutableStateOf(com.japaneixxx.freya.data.MANUAL_ACCOUNT_ID) }
     val amount = parseAmount(value)
     val dateOk = runCatching { LocalDate.parse(date) }.isSuccess
     val valid = desc.isNotBlank() && amount != null && amount > 0 && dateOk
@@ -485,14 +489,29 @@ fun AddSheet(vm: AppViewModel, onClose: () -> Unit) {
             )
             OutlinedTextField(desc, { desc = it }, label = { Text("Descrição") }, singleLine = true,
                 shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(date, { date = it }, label = { Text("Data (AAAA-MM-DD)") }, singleLine = true,
-                isError = !dateOk, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth())
+            DateField(date, { date = it }, "Data", shape = RoundedCornerShape(16.dp))
+            if (cashList.isNotEmpty()) {
+                Text("Onde foi", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = accountId == com.japaneixxx.freya.data.MANUAL_ACCOUNT_ID,
+                        onClick = { accountId = com.japaneixxx.freya.data.MANUAL_ACCOUNT_ID },
+                        label = { Text("Sem conta") }
+                    )
+                    cashList.forEach { a ->
+                        FilterChip(selected = accountId == a.id, onClick = { accountId = a.id }, label = { Text("💵 ${a.name}") })
+                    }
+                }
+            }
             CategoryPicker(cat, Cats.all) { cat = it }
             Button(
                 enabled = valid,
                 onClick = {
                     val v = amount ?: return@Button
-                    vm.addManual(desc.trim(), if (expense) -v else v, date, cat)
+                    vm.addManual(desc.trim(), if (expense) -v else v, date, cat, accountId)
                     onClose()
                 },
                 modifier = Modifier.fillMaxWidth()

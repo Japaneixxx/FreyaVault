@@ -27,8 +27,12 @@ investimentos diretamente no aparelho.
   meta reversa e comparação de cenários.
 - Alertas locais de orçamento, contas a pagar, faturas e saldo previsto.
 - Widget de saldo, tema claro/escuro/sistema e modo para ocultar valores.
-- Exportação CSV, resumo mensal compartilhável e backup/restauração em JSON.
-- Bloqueio por biometria e PIN próprio de 4 dígitos.
+- Exportação CSV, resumo mensal compartilhável e backup/restauração em JSON, com senha opcional (AES-256).
+- Dinheiro físico: em Mais > Dinheiro físico, crie contas de dinheiro vivo; o saldo acompanha os lançamentos
+  feitos nelas (Extrato > + > "Onde foi"), pode ser ajustado e entra no total e no patrimônio.
+- Transferências entre as suas próprias contas (Pix/TED de mesmo valor em contas diferentes, até 1 dia de
+  diferença) são reconhecidas e não contam como receita nem despesa; uma categoria escolhida à mão vence.
+- Bloqueio por biometria e PIN próprio de 4 dígitos, com espera após tentativas erradas.
 - Atualização pelo próprio app quando existe uma Release publicada no GitHub.
 
 ## Instalação para desenvolvimento
@@ -89,30 +93,48 @@ Em **Mais > Segurança e avisos**, é possível:
 - ativar o modo para ocultar valores;
 - controlar a verificação automática de atualizações.
 
-O PIN não é salvo em texto puro: o app guarda apenas um hash com salt no
-`EncryptedSharedPreferences`, protegido pelo Android Keystore.
+O PIN não é salvo em texto puro: o app guarda apenas um hash PBKDF2 com salt no
+`EncryptedSharedPreferences`, protegido pelo Android Keystore. Depois de 5 erros seguidos o PIN
+trava por 30 s, e o tempo dobra a cada erro (até 15 min). PINs da versão anterior (SHA-256) são
+migrados no primeiro desbloqueio. Com valores ocultos ou bloqueio ligado, o app usa `FLAG_SECURE`
+(sem capturas de tela e sem miniatura nos apps recentes).
 
-O backup em JSON inclui dados locais que não vêm diretamente do banco, como
-orçamentos, metas, contas a pagar, regras, notas e lançamentos manuais. Guarde o
-arquivo de backup em local seguro.
+O backup em JSON inclui dados locais que não vêm diretamente do banco: orçamentos, metas,
+contas a pagar, regras, notas, lançamentos manuais, contas de dinheiro, histórico dos gráficos,
+categorias próprias e apelidos de contas. Ele pode ser protegido com senha (AES-256-GCM, chave
+derivada por PBKDF2); sem a senha não há como recuperá-lo. Ao restaurar, **Mesclar** só adiciona o
+que não existe e **Substituir** troca o que o backup contém; a restauração roda numa transação (se
+falhar, nada muda). O app lembra de fazer backup a cada 30 dias.
 
 ## Sincronização e atualizações
 
 - A sincronização é iniciada ao abrir ou retornar ao app, respeitando o intervalo
   mínimo entre consultas.
+- Cada banco é sincronizado de forma independente e gravado numa transação: se um falhar, os
+  outros continuam e o aviso informa qual foi. Falhas temporárias do Pluggy (429/5xx) têm novas
+  tentativas automáticas.
 - Não há serviço próprio nem servidor intermediário.
 - O app pode consultar a Release mais recente do repositório
   [Japaneixxx/FreyaVault](https://github.com/Japaneixxx/FreyaVault).
-- Se houver um APK novo, o Android solicitará confirmação para instalar.
+- Se houver um APK novo, o Android solicitará confirmação para instalar. O APK é conferido pelo
+  SHA-256 publicado na Release (`app-release.apk.sha256`).
 - A opção fica em **Mais > Segurança e avisos** e vem ativada por padrão.
-- Versões **beta** (último dígito do Bug igual a 1, 3 ou 5, como `1.8.41`, `1.8.43` e `1.8.45`;
-  `x.x.5` é estável) são publicadas como pré-lançamento no GitHub e só aparecem quando você
+- Versões **beta** (o último número da versão tem 2 dígitos, como `1.8.41` e `1.8.51`;
+  com 1 dígito, como `1.8.5` e `1.9.0`, é estável) são publicadas como pré-lançamento no GitHub e só aparecem quando você
   toca em **Verificar atualizações**; a verificação automática ao abrir oferece só as estáveis.
 
 O histórico de versões fica em
 `app/src/main/java/com/japaneixxx/freya/ui/Changelog.kt`. Cada nova versão deve entrar no
 topo de `releaseNotes`, com a mesma versão definida em `app/build.gradle.kts`.
 As versões `1.x` atuais usam o codinome **Fimbulwinter**.
+
+## Testes automatizados
+
+Testes unitários (JUnit, sem emulador) em `app/src/test`: categorização, Sanitizer, transferências
+entre contas próprias, backup (exportar, restaurar, mesclar/substituir, versão futura), criptografia do
+backup, PIN, regras de versão/beta, totais em moeda e as regras de Insights (envelopes, contas a pagar,
+parcelas, receitas). Rode com `gradle testDebugUnitTest`; o workflow executa a mesma suíte antes de
+gerar a Release.
 
 ## Build e publicação
 
