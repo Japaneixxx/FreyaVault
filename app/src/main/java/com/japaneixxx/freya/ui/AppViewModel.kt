@@ -95,15 +95,6 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
         }
     }
 
-    init {
-        // Tudo é local: sem backup, trocar de celular zera tudo. Lembra a cada 30 dias (conta a partir do 1º uso).
-        val now = System.currentTimeMillis()
-        if (settings.lastBackupAt == 0L) settings.lastBackupAt = now
-        else if (settings.configured && now - settings.lastBackupAt > 30L * 24 * 60 * 60 * 1000) {
-            message = "Faz mais de 30 dias do último backup. Faça um em Mais > Backup."
-        }
-    }
-
     fun dismissWhatsNew() {
         settings.lastSeenVersion = currentVersion
         whatsNewFrom = null
@@ -114,6 +105,15 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     var setupError by mutableStateOf<String?>(null)
     var syncing by mutableStateOf(false)
     var message by mutableStateOf<String?>(null)
+
+    init {
+        // Tudo é local: sem backup, trocar de celular zera tudo. Lembra a cada 30 dias (conta a partir do 1º uso).
+        val now = System.currentTimeMillis()
+        if (settings.lastBackupAt == 0L) settings.lastBackupAt = now
+        else if (settings.configured && now - settings.lastBackupAt > 30L * 24 * 60 * 60 * 1000) {
+            message = "Faz mais de 30 dias do último backup. Faça um em Mais > Backup."
+        }
+    }
     var lastSync by mutableStateOf(settings.lastSync)
     var bankUpdatedAt by mutableStateOf(settings.bankUpdatedAt)
 
