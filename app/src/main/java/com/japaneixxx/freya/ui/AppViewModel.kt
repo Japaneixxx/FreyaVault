@@ -152,16 +152,16 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     /** Pedido para abrir a tela de novo lançamento (atalho "Novo lançamento"). */
     var addRequest by mutableStateOf(false)
 
-    /** Muda a cor só na tela, enquanto o usuário arrasta os controles; use [setAccent] para gravar. */
+    /** Muda a cor só na tela, enquanto o usuário arrasta os controles; use [updateAccent] para gravar. */
     fun previewAccent(argb: Int) { accent = argb }
-    fun setAccent(argb: Int) {
+    fun updateAccent(argb: Int) {
         settings.accentColor = argb
         accent = argb
         BalanceWidget.refresh(app)
     }
-    fun setFontScalePct(pct: Int) { settings.fontScalePct = pct; fontScalePct = settings.fontScalePct }
-    fun setUiDensity(level: Int) { settings.uiDensity = level; uiDensity = settings.uiDensity }
-    fun setStartTab(tab: Int) { settings.startTab = tab; startTab = settings.startTab }
+    fun updateFontScalePct(pct: Int) { settings.fontScalePct = pct; fontScalePct = settings.fontScalePct }
+    fun updateUiDensity(level: Int) { settings.uiDensity = level; uiDensity = settings.uiDensity }
+    fun updateStartTab(tab: Int) { settings.startTab = tab; startTab = settings.startTab }
     fun updateTabOrder(order: List<Int>) { tabOrder = order; settings.tabOrder = encodeTabOrder(order) }
     fun setShortcuts(ids: List<String>) {
         val clean = ids.distinct().take(MAX_SHORTCUTS)
@@ -353,7 +353,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     }
 
     // ---- Agenda do celular ----
-    fun setCalendarEnabled(enabled: Boolean) {
+    fun updateCalendarEnabled(enabled: Boolean) {
         if (enabled && !CalendarSync.hasPermission(app)) {
             message = "Permita o acesso à agenda para ativar os lembretes"
             return
@@ -367,9 +367,9 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun setCalendarBills(on: Boolean) { settings.calendarBills = on; calendarBills = on; syncCalendar() }
-    fun setCalendarShowAmount(on: Boolean) { settings.calendarShowAmount = on; calendarShowAmount = on; syncCalendar() }
-    fun setCalendarLeadDays(days: Int) { settings.calendarLeadDays = days; calendarLeadDays = settings.calendarLeadDays; syncCalendar() }
+    fun updateCalendarBills(on: Boolean) { settings.calendarBills = on; calendarBills = on; syncCalendar() }
+    fun updateCalendarShowAmount(on: Boolean) { settings.calendarShowAmount = on; calendarShowAmount = on; syncCalendar() }
+    fun updateCalendarLeadDays(days: Int) { settings.calendarLeadDays = days; calendarLeadDays = settings.calendarLeadDays; syncCalendar() }
 
     /** Idempotente: cria, atualiza e remove os lembretes conforme os vencimentos atuais. */
     fun syncCalendar(announce: Boolean = false) {

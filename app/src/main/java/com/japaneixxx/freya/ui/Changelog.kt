@@ -23,6 +23,10 @@ data class ReleaseNote(
  */
 val releaseNotes: List<ReleaseNote> = listOf(
     ReleaseNote(
+        "1.10.1", "Correção na compilação",
+        listOf("Corrigido um erro que impedia a compilação do aplicativo.")
+    ),
+    ReleaseNote(
         "1.10.0", "Agenda, faturas por ciclo e o app do seu jeito",
         listOf(
             "Mais > Agenda do celular: o Freya cria lembretes com o vencimento das faturas dos cartões (e, se quiser, das contas a pagar) num calendário local \"Freya\", com aviso antes e no dia. Os eventos são atualizados sozinhos quando a fatura muda ou é paga. O valor só vai para o evento se você ligar a opção; com valores ocultos ou bloqueio ativo ele nunca é escrito.",

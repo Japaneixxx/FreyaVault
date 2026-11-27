@@ -41,7 +41,7 @@ fun AppearanceCard(vm: AppViewModel) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Slider(
                 value = pct, onValueChange = { pct = it },
-                onValueChangeFinished = { vm.setFontScalePct(pct.toInt()) },
+                onValueChangeFinished = { vm.updateFontScalePct(pct.toInt()) },
                 valueRange = FONT_PCT_MIN.toFloat()..FONT_PCT_MAX.toFloat(),
                 steps = (FONT_PCT_MAX - FONT_PCT_MIN) / 5 - 1,
                 modifier = Modifier.weight(1f)
@@ -50,7 +50,7 @@ fun AppearanceCard(vm: AppViewModel) {
             Text("${pct.toInt()}%", style = MaterialTheme.typography.labelLarge)
         }
         Text("Amostra: ${moneyPlain(1234.56)} no mercado", style = MaterialTheme.typography.bodyLarge)
-        TextButton(onClick = { vm.setFontScalePct(100) }, enabled = vm.fontScalePct != 100) { Text("Voltar ao padrão") }
+        TextButton(onClick = { vm.updateFontScalePct(100) }, enabled = vm.fontScalePct != 100) { Text("Voltar ao padrão") }
 
         Spacer(Modifier.height(8.dp))
         Text("Densidade", style = MaterialTheme.typography.titleSmall)
@@ -61,7 +61,7 @@ fun AppearanceCard(vm: AppViewModel) {
         Spacer(Modifier.height(6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             DENSITY_LABELS.forEachIndexed { i, l ->
-                FilterChip(selected = vm.uiDensity == i, onClick = { vm.setUiDensity(i) }, label = { Text(l) })
+                FilterChip(selected = vm.uiDensity == i, onClick = { vm.updateUiDensity(i) }, label = { Text(l) })
             }
         }
     }
@@ -74,7 +74,7 @@ private fun AccentPicker(vm: AppViewModel) {
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         ACCENT_PRESETS.forEach { p ->
             val shown = if (p.argb == 0) accentColors(0xFF3F5F8A.toInt(), false).primary else p.argb
-            Swatch(Color(shown), selected = !free && vm.accent == p.argb, label = p.name) { free = false; vm.setAccent(p.argb) }
+            Swatch(Color(shown), selected = !free && vm.accent == p.argb, label = p.name) { free = false; vm.updateAccent(p.argb) }
         }
         Box(
             Modifier.size(40.dp).clip(CircleShape)
@@ -89,7 +89,7 @@ private fun AccentPicker(vm: AppViewModel) {
         var hue by remember { mutableFloatStateOf(start[0]) }
         var sat by remember { mutableFloatStateOf(start[1].coerceAtLeast(0.2f)) }
         var light by remember { mutableFloatStateOf(start[2]) }
-        val commit = { vm.setAccent(hslToArgb(hue, sat, light)) }
+        val commit = { vm.updateAccent(hslToArgb(hue, sat, light)) }
         val preview = { vm.previewAccent(hslToArgb(hue, sat, light)) }
         Spacer(Modifier.height(8.dp))
         Text("Cor livre", style = MaterialTheme.typography.labelLarge)
@@ -128,7 +128,7 @@ fun TabsAndShortcutsCard(vm: AppViewModel) {
         Spacer(Modifier.height(6.dp))
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             vm.tabOrder.forEach { id ->
-                FilterChip(selected = vm.startTab == id, onClick = { vm.setStartTab(id) }, label = { Text(TAB_LABELS[id]) })
+                FilterChip(selected = vm.startTab == id, onClick = { vm.updateStartTab(id) }, label = { Text(TAB_LABELS[id]) })
             }
         }
 

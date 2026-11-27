@@ -86,7 +86,7 @@ fun MoreScreen(vm: AppViewModel) {
     }
 
     val calendarPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
-        if (result.values.isNotEmpty() && result.values.all { it }) vm.setCalendarEnabled(true)
+        if (result.values.isNotEmpty() && result.values.all { it }) vm.updateCalendarEnabled(true)
         else vm.message = "Permissão da agenda negada"
     }
 
@@ -168,8 +168,8 @@ fun MoreScreen(vm: AppViewModel) {
                 "Coloca o vencimento das faturas dos cartões no calendário do celular, com aviso antes e no dia.",
                 vm.calendarEnabled
             ) { on ->
-                if (!on) vm.setCalendarEnabled(false)
-                else if (CalendarSync.hasPermission(ctx)) vm.setCalendarEnabled(true)
+                if (!on) vm.updateCalendarEnabled(false)
+                else if (CalendarSync.hasPermission(ctx)) vm.updateCalendarEnabled(true)
                 else runCatching { calendarPermission.launch(CalendarSync.PERMISSIONS) }
                     .onFailure { vm.message = "Não foi possível solicitar a permissão da agenda" }
             }
@@ -178,17 +178,17 @@ fun MoreScreen(vm: AppViewModel) {
                 Text("Primeiro aviso", style = MaterialTheme.typography.bodyMedium)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(0 to "No dia", 1 to "1 dia antes", 2 to "2 dias", 3 to "3 dias").forEach { (d, l) ->
-                        FilterChip(selected = vm.calendarLeadDays == d, onClick = { vm.setCalendarLeadDays(d) }, label = { Text(l) })
+                        FilterChip(selected = vm.calendarLeadDays == d, onClick = { vm.updateCalendarLeadDays(d) }, label = { Text(l) })
                     }
                 }
                 Spacer(Modifier.height(10.dp))
-                SwitchRow("Incluir contas a pagar", "Também cria lembretes dos compromissos cadastrados em Planejar.", vm.calendarBills) { vm.setCalendarBills(it) }
+                SwitchRow("Incluir contas a pagar", "Também cria lembretes dos compromissos cadastrados em Planejar.", vm.calendarBills) { vm.updateCalendarBills(it) }
                 Spacer(Modifier.height(10.dp))
                 SwitchRow(
                     "Mostrar o valor no lembrete",
                     "Desligado por padrão: o evento só diz qual fatura vence. Fica desligado com valores ocultos ou bloqueio ativo.",
                     vm.calendarShowAmount
-                ) { vm.setCalendarShowAmount(it) }
+                ) { vm.updateCalendarShowAmount(it) }
                 if (vm.calendarLabel.isNotBlank()) {
                     Spacer(Modifier.height(8.dp))
                     Text(

@@ -30,8 +30,8 @@ android {
         applicationId = "com.japaneixxx.freya"
         minSdk = 26
         targetSdk = 34
-        versionCode = 27
-        versionName = "1.10.0"
+        versionCode = 28
+        versionName = "1.10.1"
     }
 
     buildTypes {
