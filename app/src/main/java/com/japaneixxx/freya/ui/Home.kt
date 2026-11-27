@@ -101,7 +101,9 @@ fun HomeScreen(vm: AppViewModel, goPlan: () -> Unit, goAlerts: () -> Unit, goAge
     val monthEvents = agenda.filter { !it.date.isAfter(endOfMonth) }
     val endBalance = monthEvents.lastOrNull()?.balanceAfter
     val firstNegative = agenda.firstOrNull { it.balanceAfter < 0 }
-    val trend = remember(snaps) { snaps.takeLast(60).map { it.bank } }
+    val trendSnaps = remember(snaps) { snaps.takeLast(60) }
+    val trend = remember(trendSnaps) { trendSnaps.map { it.bank } }
+    val trendLabels = remember(trendSnaps) { trendSnaps.map { dayLabel(it.date) } }
     val layout = vm.homeLayout
 
     LazyColumn(
@@ -385,7 +387,11 @@ fun HomeScreen(vm: AppViewModel, goPlan: () -> Unit, goAlerts: () -> Unit, goAge
                             Text("Linha forte: este mês · linha suave: mês anterior", style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(Modifier.height(12.dp))
-                            CumulativeChart(curCum, prevCum, maxOf(ym.lengthOfMonth(), prevCum.size))
+                            CumulativeChart(
+                                curCum, prevCum, maxOf(ym.lengthOfMonth(), prevCum.size),
+                                currentLabel = monthLabel(month),
+                                previousLabel = monthLabel(ym.minusMonths(1).toString())
+                            )
                         }
                     }
                 }
@@ -397,7 +403,7 @@ fun HomeScreen(vm: AppViewModel, goPlan: () -> Unit, goAlerts: () -> Unit, goAge
                             Text("Uma foto por dia em que você sincroniza.", style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(Modifier.height(12.dp))
-                            TrendChart(trend)
+                            TrendChart(trend, labels = trendLabels)
                         }
                     }
                 }

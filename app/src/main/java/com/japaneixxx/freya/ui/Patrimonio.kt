@@ -37,7 +37,9 @@ fun NetWorthScreen(vm: AppViewModel) {
     var creatingKind by remember { mutableStateOf<String?>(null) }
 
     val nw = remember(accounts, investments, netItems) { computeNetWorth(accounts, investments, netItems) }
-    val trend = remember(snaps) { snaps.takeLast(90).map { it.total } }
+    val trendSnaps = remember(snaps) { snaps.takeLast(90) }
+    val trend = remember(trendSnaps) { trendSnaps.map { it.total } }
+    val trendLabels = remember(trendSnaps) { trendSnaps.map { dayLabel(it.date) } }
     val change = remember(snaps, nw) {
         if (snaps.size < 2) null else {
             val limit = LocalDate.now().minusDays(30).toString()
@@ -112,7 +114,7 @@ fun NetWorthScreen(vm: AppViewModel) {
                 Text("Uma foto por dia em que você sincroniza ou altera bens e dívidas.", style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(12.dp))
-                TrendChart(trend)
+                TrendChart(trend, labels = trendLabels, valueLabel = "Patrimônio líquido")
             }
         }
 

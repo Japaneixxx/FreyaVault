@@ -12,6 +12,7 @@ investimentos diretamente no aparelho.
 ## Recursos
 
 - Visão geral de saldo, receitas, despesas, categorias e evolução mensal.
+- Toque ou arraste nos gráficos de linha, barras e rosca para consultar valores, datas e categorias.
 - Extrato com busca, filtros, recategorização, observações e lançamentos manuais.
 - Categorias personalizadas e regras aprendidas a partir das alterações do usuário.
 - Planejamento com orçamentos, modo envelope, metas, compromissos, financiamentos,

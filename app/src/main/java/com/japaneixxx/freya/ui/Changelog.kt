@@ -26,7 +26,8 @@ val releaseNotes: List<ReleaseNote> = listOf(
         "1.10.3", "Recebimentos avulsos",
         listOf(
             "Corrigido um erro que repetia o mesmo recebimento avulso na agenda.",
-            "Agora é possível escolher várias datas ao cadastrar um recebimento avulso; o valor informado vale para cada dia."
+            "Agora é possível escolher várias datas ao cadastrar um recebimento avulso; o valor informado vale para cada dia.",
+            "Toque ou arraste nos gráficos para consultar os valores de cada ponto, mês ou categoria."
         )
     ),
     ReleaseNote(
