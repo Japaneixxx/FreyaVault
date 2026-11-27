@@ -23,6 +23,10 @@ data class ReleaseNote(
  */
 val releaseNotes: List<ReleaseNote> = listOf(
     ReleaseNote(
+        "1.10.5", "Retrospectiva mensal e anual",
+        listOf("Veja, quando quiser em Mais, um resumo discreto das receitas, despesas e categorias do mês ou do ano. Os dados ficam no aparelho e não geram notificações.")
+    ),
+    ReleaseNote(
         "1.10.4", "Gráficos interativos",
         listOf("Toque ou arraste nos gráficos para consultar os valores de cada ponto, mês ou categoria.")
     ),

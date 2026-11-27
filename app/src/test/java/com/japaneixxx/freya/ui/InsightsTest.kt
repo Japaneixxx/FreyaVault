@@ -134,6 +134,43 @@ class InsightsTest {
         assertFalse(f.containsKey(4))
     }
 
+    @Test fun monthlyRetrospectiveSummarizesOnlyCountedTransactions() {
+        val items = listOf(
+            spend("2026-11-03", -80.0, "Mercado"),
+            spend("2026-11-06", -20.0, "Lazer"),
+            TxItem(tx("salary", "A", "Salário", 500.0), "Receitas"),
+            TxItem(tx("ignored", "A", "Fatura", -100.0), com.japaneixxx.freya.data.CAT_CARD_PAYMENT),
+            TxItem(tx("pending", "A", "Pendente", -40.0).copy(pending = true), "Compras"),
+            spend("2026-10-10", -30.0, "Saúde")
+        )
+
+        val summary = monthlyRetrospective(items, YearMonth.of(2026, 11))
+
+        assertEquals(500.0, summary.income, 0.0)
+        assertEquals(100.0, summary.expense, 0.0)
+        assertEquals(400.0, summary.result, 0.0)
+        assertEquals(3, summary.transactionCount)
+        assertEquals("Mercado", summary.categories.first().first)
+    }
+
+    @Test fun yearlyRetrospectiveAggregatesMonthsAndCategories() {
+        val items = listOf(
+            spend("2026-01-03", -80.0, "Mercado"),
+            spend("2026-02-06", -20.0, "Mercado"),
+            TxItem(tx("salary", "A", "Salário", 500.0, "2026-02-28"), "Receitas"),
+            spend("2025-12-10", -30.0, "Saúde")
+        )
+
+        val summary = yearlyRetrospective(items, 2026)
+
+        assertEquals(500.0, summary.income, 0.0)
+        assertEquals(100.0, summary.expense, 0.0)
+        assertEquals(2, summary.activeMonths)
+        assertEquals(3, summary.transactionCount)
+        assertEquals("Mercado", summary.categories.first().first)
+        assertEquals(100.0, summary.categories.first().second, 0.0)
+    }
+
     // ---- agenda do celular ----
     private fun card(id: String, balance: Double, due: String?) =
         Account(id, "i", "Nubank", "Roxinho", "CREDIT", "CREDIT_CARD", balance, "BRL", dueDate = due)

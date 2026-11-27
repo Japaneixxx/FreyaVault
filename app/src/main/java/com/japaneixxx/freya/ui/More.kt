@@ -34,12 +34,14 @@ import kotlinx.coroutines.withContext
 fun MoreScreen(vm: AppViewModel) {
     val accounts by vm.accounts.collectAsState()
     val rules by vm.rules.collectAsState()
+    val txs by vm.txs.collectAsState()
     val groups = remember(accounts) { accounts.filter { !com.japaneixxx.freya.data.isCashAccountId(it.id) }.groupBy { it.institution } }
     var renamingAccount by remember { mutableStateOf<com.japaneixxx.freya.data.Account?>(null) }
     var confirmWipe by remember { mutableStateOf(false) }
     var showRules by remember { mutableStateOf(false) }
     var showCats by remember { mutableStateOf(false) }
     var showChangelog by remember { mutableStateOf(false) }
+    var showRetrospective by remember { mutableStateOf(false) }
     var showPinDialog by remember { mutableStateOf(false) }
     var showExportDialog by remember { mutableStateOf(false) }
     var exportPassword by remember { mutableStateOf<CharArray?>(null) }
@@ -243,6 +245,9 @@ fun MoreScreen(vm: AppViewModel) {
             )
             Spacer(Modifier.height(8.dp))
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedButton(onClick = { showRetrospective = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Ver retrospectiva mensal e anual")
+                }
                 OutlinedButton(onClick = {
                     vm.markOpenedMeuPluggy()
                     ctx.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://meu.pluggy.ai")))
@@ -331,6 +336,9 @@ fun MoreScreen(vm: AppViewModel) {
     }
     if (showChangelog) {
         ChangelogSheet(releaseNotes, "Novidades e versões", vm.currentVersion) { showChangelog = false }
+    }
+    if (showRetrospective) {
+        RetrospectiveSheet(txs) { showRetrospective = false }
     }
     if (showPinDialog) {
         var pin by remember { mutableStateOf("") }
