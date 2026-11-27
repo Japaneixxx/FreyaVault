@@ -126,17 +126,25 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     var alertsEnabled by mutableStateOf(settings.alertsEnabled)
     var checkUpdatesOnOpen by mutableStateOf(settings.checkUpdatesOnOpen)
     var calendarEnabled by mutableStateOf(settings.calendarEnabled)
+        private set
     var calendarBills by mutableStateOf(settings.calendarBills)
+        private set
     var calendarShowAmount by mutableStateOf(settings.calendarShowAmount)
+        private set
     var calendarLeadDays by mutableStateOf(settings.calendarLeadDays)
+        private set
     var calendarLabel by mutableStateOf(settings.calendarLabel)
     var themeMode by mutableStateOf(settings.themeMode)
 
     // ---- Aparência, abas e atalhos personalizados ----
     var accent by mutableIntStateOf(settings.accentColor)
+        private set
     var fontScalePct by mutableIntStateOf(settings.fontScalePct)
+        private set
     var uiDensity by mutableIntStateOf(settings.uiDensity)
+        private set
     var startTab by mutableIntStateOf(settings.startTab)
+        private set
     var tabOrder by mutableStateOf(parseTabOrder(settings.tabOrder))
     var shortcutIds by mutableStateOf(parseShortcutIds(settings.shortcutIds))
     /** Destino pedido por um atalho ou widget; o App consome depois do desbloqueio. */
