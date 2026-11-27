@@ -23,6 +23,10 @@ data class ReleaseNote(
  */
 val releaseNotes: List<ReleaseNote> = listOf(
     ReleaseNote(
+        "1.10.2", "Segurança configurável",
+        listOf("A proteção contra capturas e gravações de tela agora tem um controle separado do bloqueio por biometria ou PIN.")
+    ),
+    ReleaseNote(
         "1.10.1", "Correção na compilação",
         listOf("Corrigido um erro que impedia a compilação do aplicativo.")
     ),

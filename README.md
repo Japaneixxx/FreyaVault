@@ -105,6 +105,7 @@ o intervalo mínimo configurado.
 Em **Mais > Segurança e avisos**, é possível:
 
 - ativar o bloqueio por biometria;
+- ativar ou desativar separadamente o bloqueio de capturas e gravações de tela;
 - configurar, alterar ou remover um PIN próprio de quatro dígitos;
 - ativar o modo para ocultar valores;
 - controlar a verificação automática de atualizações.
@@ -112,8 +113,9 @@ Em **Mais > Segurança e avisos**, é possível:
 O PIN não é salvo em texto puro: o app guarda apenas um hash PBKDF2 com salt no
 `EncryptedSharedPreferences`, protegido pelo Android Keystore. Depois de 5 erros seguidos o PIN
 trava por 30 s, e o tempo dobra a cada erro (até 15 min). PINs da versão anterior (SHA-256) são
-migrados no primeiro desbloqueio. Com valores ocultos ou bloqueio ligado, o app usa `FLAG_SECURE`
-(sem capturas de tela e sem miniatura nos apps recentes).
+migrados no primeiro desbloqueio. A proteção contra capturas e gravações de tela é independente do
+bloqueio por biometria/PIN e, quando ativada, usa `FLAG_SECURE` (sem capturas ou miniatura nos apps recentes).
+Na primeira atualização, ela herda a configuração anterior de valores ocultos ou bloqueio.
 
 O backup em JSON inclui dados locais que não vêm diretamente do banco: orçamentos, metas,
 contas a pagar, regras, notas, lançamentos manuais, contas de dinheiro, histórico dos gráficos,

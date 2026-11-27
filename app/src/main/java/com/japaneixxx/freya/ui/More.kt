@@ -133,6 +133,12 @@ fun MoreScreen(vm: AppViewModel) {
                 }
             }
             Spacer(Modifier.height(10.dp))
+            SwitchRow(
+                "Impedir capturas e gravações de tela",
+                "Bloqueia capturas e gravações do app, independentemente do bloqueio por biometria ou PIN.",
+                vm.screenCaptureProtection
+            ) { vm.updateScreenCaptureProtection(it) }
+            Spacer(Modifier.height(10.dp))
             OutlinedButton(onClick = { showPinDialog = true }, modifier = Modifier.fillMaxWidth()) {
                 Text(if (vm.pinEnabled) "Alterar PIN de 4 dígitos" else "Configurar PIN de 4 dígitos")
             }

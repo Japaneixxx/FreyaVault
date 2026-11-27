@@ -11,7 +11,6 @@ import androidx.activity.viewModels
 import androidx.compose.runtime.snapshotFlow
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
-import com.japaneixxx.freya.ui.Privacy
 import kotlinx.coroutines.launch
 import com.japaneixxx.freya.ui.App
 import com.japaneixxx.freya.ui.AppTheme
@@ -52,9 +51,8 @@ class MainActivity : FragmentActivity() {
         }
         if (vm.settings.alertsEnabled) Alerts.schedule(this, true)
 
-        // Com valores ocultos ou bloqueio ligado, o app some das capturas e da miniatura dos apps recentes.
         lifecycleScope.launch {
-            snapshotFlow { Privacy.hidden || vm.lockEnabled }.collect { secure ->
+            snapshotFlow { vm.screenCaptureProtection }.collect { secure ->
                 if (secure) window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
                 else window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
             }

@@ -56,6 +56,14 @@ class Settings(ctx: Context) {
 
     var hideValues: Boolean get() = bool("hide"); set(v) = put("hide", v)
     var lockEnabled: Boolean get() = bool("lock"); set(v) = put("lock", v)
+    var screenCaptureProtection: Boolean get() = bool("screen_capture_protection"); set(v) = put("screen_capture_protection", v)
+
+    init {
+        if (!prefs.contains("screen_capture_protection")) {
+            screenCaptureProtection = hideValues || lockEnabled
+        }
+    }
+
     val hasPin: Boolean get() = str("pin_hash").isNotBlank() && str("pin_salt").isNotBlank()
     var alertsEnabled: Boolean get() = bool("alerts"); set(v) = put("alerts", v)
     var alertPromptShown: Boolean

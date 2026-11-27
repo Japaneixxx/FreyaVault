@@ -122,6 +122,8 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
 
     var locked by mutableStateOf(settings.lockEnabled)
     var lockEnabled by mutableStateOf(settings.lockEnabled)
+    var screenCaptureProtection by mutableStateOf(settings.screenCaptureProtection)
+        private set
     var pinEnabled by mutableStateOf(settings.hasPin)
     var alertsEnabled by mutableStateOf(settings.alertsEnabled)
     var checkUpdatesOnOpen by mutableStateOf(settings.checkUpdatesOnOpen)
@@ -319,6 +321,11 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
         settings.lockEnabled = enabled
         lockEnabled = enabled
         BalanceWidget.refresh(app)
+    }
+
+    fun updateScreenCaptureProtection(enabled: Boolean) {
+        settings.screenCaptureProtection = enabled
+        screenCaptureProtection = enabled
     }
 
     fun setPin(pin: String) {
