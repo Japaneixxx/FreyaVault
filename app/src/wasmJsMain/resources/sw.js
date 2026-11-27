@@ -1,5 +1,5 @@
 /* Freya PWA — cache offline dos arquivos estáticos do build Wasm. */
-const CACHE = "freya-web-v1";
+const CACHE = "freya-web-v2";
 /* Os chunks e o .wasm têm nomes com hash: são guardados pela estratégia network-first abaixo. */
 const CORE = ["./", "./index.html", "./manifest.json", "./icon.svg", "./icon-maskable.svg", "./freya.js"];
 
@@ -21,7 +21,10 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
     const request = event.request;
-    if (request.method !== "GET" || new URL(request.url).origin !== self.location.origin) return;
+    const url = new URL(request.url);
+    if (request.method !== "GET" || url.origin !== self.location.origin) return;
+    /* A API (proxy do Pluggy) nunca passa pelo cache: dados financeiros devem vir sempre da rede. */
+    if (url.pathname.startsWith("/api/")) return;
 
     event.respondWith(
         caches.match(request).then((cached) => {

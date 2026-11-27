@@ -96,7 +96,11 @@ o intervalo mínimo configurado.
 
 ### Erros comuns
 
-- **401/403:** confira o Client ID e o Client Secret.
+- **401/403:** confira o Client ID e o Client Secret. Na versão web, se a mensagem disser que a
+  requisição foi bloqueada antes de chegar ao Pluggy, o problema é a Vercel (veja abaixo).
+- **Web, 401/403 mesmo com credenciais certas:** em *Vercel > Project > Settings > Deployment
+  Protection*, desative a proteção dos deploys de preview (a branch `BetaWeb` não é produção) ou
+  use a URL de produção. O proxy `/api/pluggy` precisa ser acessível sem login da Vercel.
 - **404:** confira o Item ID da conexão; ele não é o Client ID.
 - **Sandbox ou contratação:** volte ao fluxo e escolha o conector MeuPluggy, não o
   banco diretamente.

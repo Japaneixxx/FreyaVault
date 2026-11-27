@@ -36,16 +36,19 @@ class PluggyApi(private val clientId: String, private val clientSecret: String) 
         if (body != null) headers["Content-Type"] = "application/json"
         val response = WebBridge.fetchText(base + path, method, headers, body)
         if (!response.ok) {
-            val msg = runCatching { JSONObject(response.body).str("message") }.getOrDefault("")
-            val hint = when (response.status) {
-                401, 403 -> " (confira Client ID / Client Secret)"
-                404 -> " (confira o Item ID)"
+            val json = runCatching { JSONObject(response.body) }.getOrNull()
+            val msg = json?.str("message").orEmpty()
+            // Resposta que não é JSON do Pluggy (ex.: HTML da Vercel) = bloqueio antes de chegar ao Pluggy.
+            val fromPluggy = json != null && msg.isNotBlank() && json.str("source") != "proxy"
+            val hint = when {
+                !fromPluggy && (response.status == 401 || response.status == 403) ->
+                    " (a requisição foi bloqueada antes de chegar ao Pluggy: confira a proteção de deploy da Vercel e o proxy /api/pluggy)"
+                response.status == 401 || response.status == 403 -> " (confira Client ID / Client Secret)"
+                response.status == 404 -> " (confira o Item ID)"
                 else -> ""
             }
-            throw PluggyHttpException(
-                response.status,
-                "Pluggy ${response.status}: ${msg.ifBlank { response.body.take(120) }}$hint"
-            )
+            val detail = msg.ifBlank { response.body.trim().take(120) }
+            throw PluggyHttpException(response.status, "Pluggy ${response.status}: $detail$hint")
         }
         return JSONObject(response.body.ifBlank { "{}" })
     }
