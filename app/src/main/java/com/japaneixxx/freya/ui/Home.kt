@@ -43,7 +43,7 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 @Composable
-fun HomeScreen(vm: AppViewModel, goPlan: () -> Unit, goAlerts: () -> Unit, goAgenda: () -> Unit) {
+fun HomeScreen(vm: AppViewModel, goPlan: () -> Unit, goAlerts: () -> Unit, goAgenda: () -> Unit, goCards: () -> Unit) {
     val accounts by vm.accounts.collectAsState()
     val txs by vm.txs.collectAsState()
     val budgets by vm.budgets.collectAsState()
@@ -56,7 +56,11 @@ fun HomeScreen(vm: AppViewModel, goPlan: () -> Unit, goAlerts: () -> Unit, goAge
     val alerts by vm.chargeAlerts.collectAsState()
     var month by rememberSaveable { mutableStateOf(monthKey()) }
     var adding by remember { mutableStateOf(false) }
+    var customizing by remember { mutableStateOf(false) }
     val ym = YearMonth.parse(month)
+    LaunchedEffect(vm.addRequest) {
+        if (vm.addRequest) { adding = true; vm.addRequest = false }
+    }
 
     val bank = accounts.filter { it.type == "BANK" }.sumOf { it.balance }
     val cards = accounts.filter { it.type == "CREDIT" }.sumOf { it.balance }
@@ -74,11 +78,7 @@ fun HomeScreen(vm: AppViewModel, goPlan: () -> Unit, goAlerts: () -> Unit, goAge
         cumulative(cur, ym.lengthOfMonth()).take(upTo)
     }
     val prevCum = remember(prev, month) { cumulative(prev, ym.minusMonths(1).lengthOfMonth()) }
-    val perDay = remember(cur) {
-        cur.filter { it.tx.amount < 0 }
-            .groupBy { it.tx.date.takeLast(2).toIntOrNull() ?: 0 }
-            .mapValues { (_, l) -> -l.sumOf { it.tx.amount } }
-    }
+    val flows = remember(cur) { dayFlows(cur) }
     val insights = remember(real, month, Privacy.hidden) { buildInsights(real, month) }
     val last6 = remember(real) {
         (5 downTo 0).map { i ->
@@ -102,6 +102,7 @@ fun HomeScreen(vm: AppViewModel, goPlan: () -> Unit, goAlerts: () -> Unit, goAge
     val endBalance = monthEvents.lastOrNull()?.balanceAfter
     val firstNegative = agenda.firstOrNull { it.balanceAfter < 0 }
     val trend = remember(snaps) { snaps.takeLast(60).map { it.bank } }
+    val layout = vm.homeLayout
 
     LazyColumn(
         Modifier.fillMaxSize(),
@@ -120,7 +121,7 @@ fun HomeScreen(vm: AppViewModel, goPlan: () -> Unit, goAlerts: () -> Unit, goAge
             val glowA = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
             val glowB = MaterialTheme.colorScheme.secondary.copy(alpha = 0.14f)
             Box(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(30.dp)).background(
+                Modifier.fillMaxWidth().tourTarget("hero").clip(RoundedCornerShape(30.dp)).background(
                     Brush.linearGradient(
                         listOf(
                             MaterialTheme.colorScheme.primaryContainer,
@@ -201,234 +202,264 @@ fun HomeScreen(vm: AppViewModel, goPlan: () -> Unit, goAlerts: () -> Unit, goAge
                 }
             }
         }
-        if (agenda.isNotEmpty()) item {
-            NCard(Modifier.fillMaxWidth()) {
-                SectionTitle("Agenda")
-                Spacer(Modifier.height(6.dp))
-                agenda.take(4).forEach { e ->
-                    val days = ChronoUnit.DAYS.between(LocalDate.now(), e.date).toInt()
-                    val whenTxt = when { days <= 0 -> "hoje"; days == 1 -> "amanhã"; else -> "em $days dias" }
-                    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            Modifier.size(38.dp).background(
-                                (if (e.amount > 0) IncomeColor else ExpenseColor).copy(alpha = 0.15f), CircleShape
-                            ),
-                            contentAlignment = Alignment.Center
-                        ) { Text(when (e.type) { "INCOME" -> "💰"; "CARD" -> "💳"; else -> "🧾" }) }
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(e.name, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(
-                                whenTxt + (e.note?.let { " · $it" } ?: ""), style = MaterialTheme.typography.bodySmall,
-                                color = if (e.note?.contains("atrasada") == true) ExpenseColor else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Text(
-                            (if (e.amount > 0) "+ " else "") + money(e.amount),
-                            color = if (e.amount > 0) IncomeColor else MaterialTheme.colorScheme.onSurface,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-                TextButton(onClick = goAgenda) { Text("Ver agenda completa") }
-            }
-        }
-        if (alerts.isNotEmpty()) item {
-            NCard(
-                Modifier.fillMaxWidth(),
-                container = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.55f),
-                onClick = goAlerts
-            ) {
-                SectionTitle("Atenção")
-                Spacer(Modifier.height(6.dp))
-                alerts.take(2).forEach { a ->
-                    Text(
-                        (if (a.isDuplicate) "⚠️ Possível duplicada: " else "📈 Mais cara: ") + a.title,
-                        style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium
-                    )
-                    Text(a.describe { money(it) }, style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 8.dp))
-                }
-                Text(
-                    if (alerts.size > 2) "Ver mais ${alerts.size - 2} aviso(s)" else "Revisar cobranças",
-                    style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary
-                )
-            }
-        }
-
-        // ---------- mês ----------
-        item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { month = ym.minusMonths(1).toString() }) { Icon(Icons.Default.KeyboardArrowLeft, "Mês anterior") }
-                AnimatedContent(
-                    targetState = month,
-                    transitionSpec = {
-                        (fadeIn(tween(220)) + slideInVertically(tween(260, easing = Motion.EaseOut)) { it / 3 }) togetherWith
-                            (fadeOut(tween(120)) + slideOutVertically(tween(220, easing = Motion.EaseOut)) { -it / 3 })
-                    },
-                    label = "monthTitle"
-                ) { m -> Text(monthLabel(m), style = MaterialTheme.typography.titleMedium) }
-                IconButton(onClick = { month = ym.plusMonths(1).toString() }, enabled = month < monthKey()) {
-                    Icon(Icons.Default.KeyboardArrowRight, "Próximo mês")
-                }
-            }
-        }
-        item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                StatCard("Receitas", "▲", income, IncomeColor, Modifier.weight(1f))
-                StatCard("Despesas", "▼", expense, ExpenseColor, Modifier.weight(1f))
-            }
-        }
-        item {
-            val res = income - expense
-            NCard(Modifier.fillMaxWidth(), container = if (res >= 0) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Column {
-                        Text("Resultado do mês", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        AnimatedMoney(
-                            value = res,
-                            style = MaterialTheme.typography.headlineSmall,
-                            color = if (res >= 0) IncomeColor else ExpenseColor
-                        )
-                    }
-                    if (income > 0) Pill("${((res / income) * 100).roundToInt()}% da receita")
-                }
-            }
-        }
-
-        // ---------- insights (carrossel) ----------
-        if (insights.isNotEmpty()) item {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                itemsIndexed(insights) { index, text ->
-                    Card(
-                        Modifier.width(250.dp).appear(index),
-                        shape = MaterialTheme.shapes.large,
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
-                    ) {
-                        Column(Modifier.padding(16.dp)) {
-                            Text("💡", style = MaterialTheme.typography.titleMedium)
-                            Spacer(Modifier.height(4.dp))
-                            Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSecondaryContainer)
-                        }
-                    }
-                }
-            }
-        }
-
-        // ---------- categorias ----------
-        item {
-            NCard(Modifier.fillMaxWidth()) {
-                SectionTitle("Para onde foi o dinheiro")
-                Spacer(Modifier.height(12.dp))
-                if (byCat.isEmpty()) {
-                    Text("Sem despesas neste mês.", style = MaterialTheme.typography.bodyMedium)
-                } else {
-                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { DonutChart(byCat.take(8)) }
-                    Spacer(Modifier.height(12.dp))
-                    val total = byCat.sumOf { it.second }.coerceAtLeast(1.0)
-                    byCat.take(6).forEachIndexed { index, (cat, v) ->
-                        val before = prevByCat[cat]
-                        Row(
-                            Modifier.fillMaxWidth().appear(index).padding(vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            CategoryAvatar(cat, 36.dp)
-                            Spacer(Modifier.width(12.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(cat, style = MaterialTheme.typography.bodyMedium)
-                                if (before != null && before > 0) {
-                                    val d = ((v - before) / before * 100).roundToInt()
-                                    if (abs(d) >= 5) Text(
-                                        (if (d > 0) "▲ " else "▼ ") + "${abs(d)}% vs mês anterior",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = if (d > 0) ExpenseColor else IncomeColor
+        layout.filter { it.visible }.forEach { block ->
+            when (block.id) {
+                "agenda" -> {
+                    if (agenda.isNotEmpty()) item {
+                        NCard(Modifier.fillMaxWidth()) {
+                            SectionTitle("Agenda")
+                            Spacer(Modifier.height(6.dp))
+                            agenda.take(4).forEach { e ->
+                                val days = ChronoUnit.DAYS.between(LocalDate.now(), e.date).toInt()
+                                val whenTxt = when { days <= 0 -> "hoje"; days == 1 -> "amanhã"; else -> "em $days dias" }
+                                Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        Modifier.size(38.dp).background(
+                                            (if (e.amount > 0) IncomeColor else ExpenseColor).copy(alpha = 0.15f), CircleShape
+                                        ),
+                                        contentAlignment = Alignment.Center
+                                    ) { Text(when (e.type) { "INCOME" -> "💰"; "CARD" -> "💳"; else -> "🧾" }) }
+                                    Spacer(Modifier.width(12.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        Text(e.name, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(
+                                            whenTxt + (e.note?.let { " · $it" } ?: ""), style = MaterialTheme.typography.bodySmall,
+                                            color = if (e.note?.contains("atrasada") == true) ExpenseColor else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Text(
+                                        (if (e.amount > 0) "+ " else "") + money(e.amount),
+                                        color = if (e.amount > 0) IncomeColor else MaterialTheme.colorScheme.onSurface,
+                                        fontWeight = FontWeight.Medium
                                     )
                                 }
                             }
-                            Column(horizontalAlignment = Alignment.End) {
-                                Text(money(v), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                                Text("${(v / total * 100).roundToInt()}%", style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            TextButton(onClick = goAgenda) { Text("Ver agenda completa") }
+                        }
+                    }
+                }
+                "alerts" -> {
+                    if (alerts.isNotEmpty()) item {
+                        NCard(
+                            Modifier.fillMaxWidth(),
+                            container = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.55f),
+                            onClick = goAlerts
+                        ) {
+                            SectionTitle("Atenção")
+                            Spacer(Modifier.height(6.dp))
+                            alerts.take(2).forEach { a ->
+                                Text(
+                                    (if (a.isDuplicate) "⚠️ Possível duplicada: " else "📈 Mais cara: ") + a.title,
+                                    style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium
+                                )
+                                Text(a.describe { money(it) }, style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 8.dp))
+                            }
+                            Text(
+                                if (alerts.size > 2) "Ver mais ${alerts.size - 2} aviso(s)" else "Revisar cobranças",
+                                style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+                "month" -> {
+                    // ---------- mês ----------
+                    item {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { month = ym.minusMonths(1).toString() }) { Icon(Icons.Default.KeyboardArrowLeft, "Mês anterior") }
+                            AnimatedContent(
+                                targetState = month,
+                                transitionSpec = {
+                                    (fadeIn(tween(220)) + slideInVertically(tween(260, easing = Motion.EaseOut)) { it / 3 }) togetherWith
+                                        (fadeOut(tween(120)) + slideOutVertically(tween(220, easing = Motion.EaseOut)) { -it / 3 })
+                                },
+                                label = "monthTitle"
+                            ) { m -> Text(monthLabel(m), style = MaterialTheme.typography.titleMedium) }
+                            IconButton(onClick = { month = ym.plusMonths(1).toString() }, enabled = month < monthKey()) {
+                                Icon(Icons.Default.KeyboardArrowRight, "Próximo mês")
+                            }
+                        }
+                    }
+                    item {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            StatCard("Receitas", "▲", income, IncomeColor, Modifier.weight(1f))
+                            StatCard("Despesas", "▼", expense, ExpenseColor, Modifier.weight(1f))
+                        }
+                    }
+                    item {
+                        val res = income - expense
+                        NCard(Modifier.fillMaxWidth(), container = if (res >= 0) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Column {
+                                    Text("Resultado do mês", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    AnimatedMoney(
+                                        value = res,
+                                        style = MaterialTheme.typography.headlineSmall,
+                                        color = if (res >= 0) IncomeColor else ExpenseColor
+                                    )
+                                }
+                                if (income > 0) Pill("${((res / income) * 100).roundToInt()}% da receita")
                             }
                         }
                     }
                 }
-            }
-        }
-        item {
-            NCard(Modifier.fillMaxWidth()) {
-                SectionTitle("Calendário de gastos")
-                Spacer(Modifier.height(4.dp))
-                Text("Quanto mais escuro o dia, maior o gasto.", style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(12.dp))
-                SpendHeatmap(ym, perDay)
-            }
-        }
-        item {
-            NCard(Modifier.fillMaxWidth()) {
-                SectionTitle("Ritmo de gastos")
-                Spacer(Modifier.height(4.dp))
-                Text("Linha forte: este mês · linha suave: mês anterior", style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(12.dp))
-                CumulativeChart(curCum, prevCum, maxOf(ym.lengthOfMonth(), prevCum.size))
-            }
-        }
-        if (trend.size >= 2) item {
-            NCard(Modifier.fillMaxWidth()) {
-                SectionTitle("Evolução do saldo")
-                Spacer(Modifier.height(4.dp))
-                Text("Uma foto por dia em que você sincroniza.", style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(12.dp))
-                TrendChart(trend)
-            }
-        }
-        item {
-            NCard(Modifier.fillMaxWidth()) {
-                SectionTitle("Orçamentos")
-                Spacer(Modifier.height(8.dp))
-                if (budgetRows.isEmpty()) {
-                    Text("Defina limites por categoria para acompanhar seus gastos.", style = MaterialTheme.typography.bodyMedium)
-                    TextButton(onClick = goPlan) { Text("Criar orçamentos") }
-                } else {
-                    budgetRows.forEach { (cat, spent, limit) -> BudgetBar(cat, spent, limit) }
-                    TextButton(onClick = goPlan) { Text("Ver todos") }
-                }
-            }
-        }
-        item {
-            NCard(Modifier.fillMaxWidth()) {
-                SectionTitle("Últimos 6 meses")
-                Spacer(Modifier.height(12.dp))
-                MonthlyBars(last6)
-            }
-        }
-        if (topTx.isNotEmpty()) item {
-            NCard(Modifier.fillMaxWidth()) {
-                SectionTitle("Maiores gastos do mês")
-                Spacer(Modifier.height(6.dp))
-                topTx.forEachIndexed { index, tx ->
-                    Row(
-                        Modifier.fillMaxWidth().appear(index).padding(vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        CategoryAvatar(tx.category, 38.dp)
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(tx.clean.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
-                            Text(tx.category, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                "insights" -> {
+                    // ---------- insights (carrossel) ----------
+                    if (insights.isNotEmpty()) item {
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            itemsIndexed(insights) { index, text ->
+                                Card(
+                                    Modifier.width(250.dp).appear(index),
+                                    shape = MaterialTheme.shapes.large,
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                                ) {
+                                    Column(Modifier.padding(16.dp)) {
+                                        Text("💡", style = MaterialTheme.typography.titleMedium)
+                                        Spacer(Modifier.height(4.dp))
+                                        Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                                    }
+                                }
+                            }
                         }
-                        Spacer(Modifier.width(12.dp))
-                        Text(money(tx.tx.amount), fontWeight = FontWeight.Medium)
                     }
                 }
+                "categories" -> {
+                    // ---------- categorias ----------
+                    item {
+                        NCard(Modifier.fillMaxWidth()) {
+                            SectionTitle("Para onde foi o dinheiro")
+                            Spacer(Modifier.height(12.dp))
+                            if (byCat.isEmpty()) {
+                                Text("Sem despesas neste mês.", style = MaterialTheme.typography.bodyMedium)
+                            } else {
+                                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { DonutChart(byCat.take(8)) }
+                                Spacer(Modifier.height(12.dp))
+                                val total = byCat.sumOf { it.second }.coerceAtLeast(1.0)
+                                byCat.take(6).forEachIndexed { index, (cat, v) ->
+                                    val before = prevByCat[cat]
+                                    Row(
+                                        Modifier.fillMaxWidth().appear(index).padding(vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        CategoryAvatar(cat, 36.dp)
+                                        Spacer(Modifier.width(12.dp))
+                                        Column(Modifier.weight(1f)) {
+                                            Text(cat, style = MaterialTheme.typography.bodyMedium)
+                                            if (before != null && before > 0) {
+                                                val d = ((v - before) / before * 100).roundToInt()
+                                                if (abs(d) >= 5) Text(
+                                                    (if (d > 0) "▲ " else "▼ ") + "${abs(d)}% vs mês anterior",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = if (d > 0) ExpenseColor else IncomeColor
+                                                )
+                                            }
+                                        }
+                                        Column(horizontalAlignment = Alignment.End) {
+                                            Text(money(v), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                                            Text("${(v / total * 100).roundToInt()}%", style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                "heatmap" -> {
+                    item {
+                        NCard(Modifier.fillMaxWidth()) {
+                            SectionTitle("Calendário de gastos")
+                            Spacer(Modifier.height(4.dp))
+                            Text("Vermelho: o dia teve mais saídas. Verde-azulado: mais entradas. Toque num dia para ver os lançamentos.", style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(Modifier.height(12.dp))
+                            SpendHeatmap(ym, flows, cur)
+                        }
+                    }
+                }
+                "pace" -> {
+                    item {
+                        NCard(Modifier.fillMaxWidth()) {
+                            SectionTitle("Ritmo de gastos")
+                            Spacer(Modifier.height(4.dp))
+                            Text("Linha forte: este mês · linha suave: mês anterior", style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(Modifier.height(12.dp))
+                            CumulativeChart(curCum, prevCum, maxOf(ym.lengthOfMonth(), prevCum.size))
+                        }
+                    }
+                }
+                "trend" -> {
+                    if (trend.size >= 2) item {
+                        NCard(Modifier.fillMaxWidth()) {
+                            SectionTitle("Evolução do saldo")
+                            Spacer(Modifier.height(4.dp))
+                            Text("Uma foto por dia em que você sincroniza.", style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(Modifier.height(12.dp))
+                            TrendChart(trend)
+                        }
+                    }
+                }
+                "budgets" -> {
+                    item {
+                        NCard(Modifier.fillMaxWidth()) {
+                            SectionTitle("Orçamentos")
+                            Spacer(Modifier.height(8.dp))
+                            if (budgetRows.isEmpty()) {
+                                Text("Defina limites por categoria para acompanhar seus gastos.", style = MaterialTheme.typography.bodyMedium)
+                                TextButton(onClick = goPlan) { Text("Criar orçamentos") }
+                            } else {
+                                budgetRows.forEach { (cat, spent, limit) -> BudgetBar(cat, spent, limit) }
+                                TextButton(onClick = goPlan) { Text("Ver todos") }
+                            }
+                        }
+                    }
+                }
+                "last6" -> {
+                    item {
+                        NCard(Modifier.fillMaxWidth()) {
+                            SectionTitle("Últimos 6 meses")
+                            Spacer(Modifier.height(12.dp))
+                            MonthlyBars(last6)
+                        }
+                    }
+                }
+                "top" -> {
+                    if (topTx.isNotEmpty()) item {
+                        NCard(Modifier.fillMaxWidth()) {
+                            SectionTitle("Maiores gastos do mês")
+                            Spacer(Modifier.height(6.dp))
+                            topTx.forEachIndexed { index, tx ->
+                                Row(
+                                    Modifier.fillMaxWidth().appear(index).padding(vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    CategoryAvatar(tx.category, 38.dp)
+                                    Spacer(Modifier.width(12.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        Text(tx.clean.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
+                                        Text(tx.category, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    Spacer(Modifier.width(12.dp))
+                                    Text(money(tx.tx.amount), fontWeight = FontWeight.Medium)
+                                }
+                            }
+                        }
+                    }
+                }
+                "cards" -> item {
+                    CardsHomeBlock(vm, accounts.filter { it.type == "CREDIT" }, txs, goCards)
+                }
             }
+        }
+        item {
+            TextButton(onClick = { customizing = true }, modifier = Modifier.fillMaxWidth()) { Text("Personalizar início") }
         }
     }
 
     if (adding) AddSheet(vm) { adding = false }
+    if (customizing) HomeCustomizeSheet(layout, { vm.updateHomeLayout(it) }) { customizing = false }
 }
 
 @Composable

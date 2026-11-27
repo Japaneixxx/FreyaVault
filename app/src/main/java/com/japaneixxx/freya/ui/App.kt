@@ -48,7 +48,7 @@ fun App(
             .sortedByDescending { it.value }.map { it.key }.take(6)
     }
     var planSection by rememberSaveable { mutableIntStateOf(0) }
-    var tab by rememberSaveable { mutableIntStateOf(0) }
+    var tab by rememberSaveable { mutableIntStateOf(vm.startTab) }
     var tabHistory by rememberSaveable { mutableStateOf(listOf<Int>()) }
     val snack = remember { SnackbarHostState() }
     var showAlertPrompt by remember { mutableStateOf(!vm.settings.alertPromptShown) }
@@ -57,12 +57,23 @@ fun App(
         tabHistory = tabHistory + tab
         tab = newTab
     }
-    BackHandler(enabled = tabHistory.isNotEmpty() || tab != 0) {
+    BackHandler(enabled = tabHistory.isNotEmpty() || tab != vm.startTab) {
         if (tabHistory.isNotEmpty()) {
             tab = tabHistory.last()
             tabHistory = tabHistory.dropLast(1)
         } else {
-            tab = 0
+            tab = vm.startTab
+        }
+    }
+    // Atalho do ícone, widget: abre a aba, a seção do Planejar e a ação pedidas (só depois de desbloquear).
+    LaunchedEffect(vm.pendingLink) {
+        val link = vm.pendingLink ?: return@LaunchedEffect
+        vm.pendingLink = null
+        link.planSection?.let { planSection = it }
+        navigateTo(link.tab)
+        when (link.action) {
+            "add" -> vm.addRequest = true
+            "sync" -> vm.sync()
         }
     }
     LaunchedEffect(vm.message) {
@@ -119,10 +130,26 @@ fun App(
         )
     }
 
+    // Tutorial: só roda depois dos avisos iniciais, para um diálogo não ficar por cima do outro.
+    val tourState = remember { TourState() }
+    val tourRunning = vm.tourActive && !showAlertPrompt && vm.whatsNewFrom == null && vm.updateRelease == null
+    LaunchedEffect(tab, vm.tourStep, tourRunning) {
+        if (!tourRunning) return@LaunchedEffect
+        val step = TOUR_STEPS.getOrNull(vm.tourStep) ?: return@LaunchedEffect
+        if (step.tapTab != null) {
+            if (tab == step.tapTab) vm.tourStep += 1
+        } else if (step.tab != null && tab != step.tab) {
+            tab = step.tab
+        }
+    }
+    BackHandler(enabled = tourRunning) { vm.finishTour(); tab = 0 }
+
     CompositionLocalProvider(
         LocalCategoryCreator provides { vm.addCategory(it) },
-        LocalRecentCategories provides recents
+        LocalRecentCategories provides recents,
+        LocalTour provides (if (tourRunning) tourState else null)
     ) {
+    Box(Modifier.fillMaxSize()) {
     Scaffold(
         snackbarHost = { SnackbarHost(snack) },
         bottomBar = {
@@ -130,11 +157,13 @@ fun App(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
                     val colors = NavigationBarItemDefaults.colors(indicatorColor = MaterialTheme.colorScheme.primaryContainer)
-                    NavigationBarItem(tab == 0, { navigateTo(0) }, { NavIcon(Icons.Default.Home, tab == 0) }, label = { Text("Início") }, colors = colors)
-                    NavigationBarItem(tab == 1, { navigateTo(1) }, { NavIcon(Icons.Default.List, tab == 1) }, label = { Text("Extrato") }, colors = colors)
-                    NavigationBarItem(tab == 2, { navigateTo(2) }, { NavIcon(Icons.Default.AccountBox, tab == 2) }, label = { Text("Patrimônio") }, colors = colors)
-                    NavigationBarItem(tab == 3, { navigateTo(3) }, { NavIcon(Icons.Default.CheckCircle, tab == 3) }, label = { Text("Planejar") }, colors = colors)
-                    NavigationBarItem(tab == 4, { navigateTo(4) }, { NavIcon(Icons.Default.Menu, tab == 4) }, label = { Text("Mais") }, colors = colors)
+                    val icons = listOf(Icons.Default.Home, Icons.Default.List, Icons.Default.AccountBox, Icons.Default.CheckCircle, Icons.Default.Menu)
+                    vm.tabOrder.forEach { id ->
+                        NavigationBarItem(
+                            tab == id, { navigateTo(id) }, { NavIcon(icons[id], tab == id) },
+                            label = { Text(TAB_LABELS[id]) }, colors = colors, modifier = Modifier.tourTarget("nav_$id")
+                        )
+                    }
                 }
             }
         }
@@ -150,7 +179,7 @@ fun App(
             AnimatedContent(
                 targetState = tab,
                 transitionSpec = {
-                    val forward = targetState > initialState
+                    val forward = vm.tabOrder.indexOf(targetState) > vm.tabOrder.indexOf(initialState)
                     val enter = fadeIn(tween(260)) +
                         slideInHorizontally(tween(320, easing = Motion.EaseOut)) { w ->
                             if (forward) w / 7 else -w / 7
@@ -169,7 +198,8 @@ fun App(
                         vm,
                         goPlan = { navigateTo(3) },
                         goAlerts = { planSection = PlanSection.CHARGES; navigateTo(3) },
-                        goAgenda = { planSection = PlanSection.AGENDA; navigateTo(3) }
+                        goAgenda = { planSection = PlanSection.AGENDA; navigateTo(3) },
+                        goCards = { planSection = PlanSection.CARDS; navigateTo(3) }
                     )
                     1 -> ExtratoScreen(vm)
                     2 -> NetWorthScreen(vm)
@@ -178,6 +208,19 @@ fun App(
                 }
             }
         }
+    }
+    if (tourRunning) {
+        val step = TOUR_STEPS.getOrNull(vm.tourStep)
+        if (step == null) {
+            vm.finishTour()
+        } else {
+            TourOverlay(
+                step = step, index = vm.tourStep, total = TOUR_STEPS.size, state = tourState,
+                onNext = { if (vm.tourStep >= TOUR_STEPS.lastIndex) { vm.finishTour(); tab = 0 } else vm.tourStep += 1 },
+                onSkip = { vm.finishTour(); tab = 0 }
+            )
+        }
+    }
     }
     }
 }

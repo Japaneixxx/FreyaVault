@@ -80,6 +80,7 @@ class Repository(private val settings: Settings, private val db: Db) {
     private suspend fun fetchItem(api: PluggyApi, itemId: String, institution: String): ItemData {
         val accounts = api.accounts(itemId).map { o ->
             val cd = o.optJSONObject("creditData")
+            cd?.str("balanceCloseDate")?.take(10)?.takeIf { it.length == 10 }?.let { settings.putCardCloseDate(o.getString("id"), it) }
             Account(
                 id = o.getString("id"),
                 itemId = itemId,

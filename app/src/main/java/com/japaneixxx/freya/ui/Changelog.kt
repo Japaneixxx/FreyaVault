@@ -23,6 +23,20 @@ data class ReleaseNote(
  */
 val releaseNotes: List<ReleaseNote> = listOf(
     ReleaseNote(
+        "1.10.0", "Agenda, faturas por ciclo e o app do seu jeito",
+        listOf(
+            "Mais > Agenda do celular: o Freya cria lembretes com o vencimento das faturas dos cartões (e, se quiser, das contas a pagar) num calendário local \"Freya\", com aviso antes e no dia. Os eventos são atualizados sozinhos quando a fatura muda ou é paga. O valor só vai para o evento se você ligar a opção; com valores ocultos ou bloqueio ativo ele nunca é escrito.",
+            "O Calendário de gastos ficou maior: cada dia mostra o saldo (entradas menos saídas), vermelho quando saiu mais e verde-azulado quando entrou mais, com a cor mais forte nos dias mais extremos. Toque num dia para ver quanto entrou, quanto saiu e os lançamentos dele.",
+            "Planejar > Cartões: cada cartão ganhou a fatura por ciclo. Informe o dia de fechamento (ou use o que o banco enviar) e veja o ciclo atual e os 5 anteriores, com total, categorias e lançamentos de cada um. O total vem dos lançamentos do extrato e pode diferir do valor oficial da fatura; compras no dia do fechamento entram na fatura seguinte.",
+            "Início personalizável: toque em Personalizar início, no fim da tela, para ligar, desligar e reordenar os blocos. Há também o novo bloco Faturas dos cartões, que começa desligado.",
+            "Tutorial interativo no primeiro acesso: o app destaca cada área e pede que você toque nas abas para conhecer. Dá para pular, e rever em Mais > Ajuda.",
+            "Mais > Aparência: escolha a cor de destaque entre 8 paletas ou monte a sua com os controles de cor livre; o app ajusta a claridade para o texto continuar legível nos temas claro e escuro. Também dá para mudar o tamanho do texto (80% a 140%) e a densidade (compacta, padrão ou confortável).",
+            "Mais > Abas, atalhos e widget: escolha a aba que abre com o app e a ordem da barra de baixo. Segurando o ícone do Freya você vai direto a Novo lançamento, Agenda, Faturas dos cartões, Orçamentos, Extrato, Patrimônio ou Sincronizar, até 4 por vez.",
+            "O widget de saldo agora é configurável: mostra contas, faturas ou os dois, tem estilo da cor do app, escuro, claro ou transparente, e abre o destino que você escolher. A cor do app no widget só vale no Android 12 ou mais novo."
+        ),
+        codename = "Fimbulwinter"
+    ),
+    ReleaseNote(
         "1.9.0", "Dinheiro físico e dados mais seguros",
         listOf(
             "Nova conta de dinheiro físico em Mais: crie uma carteira, registre entradas e saídas pelo + do Extrato escolhendo a conta, e ajuste o saldo quando quiser. O saldo entra no total e no patrimônio.",

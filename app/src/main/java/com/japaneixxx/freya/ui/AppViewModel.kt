@@ -2,12 +2,15 @@ package com.japaneixxx.freya.ui
 
 import android.app.Application
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.japaneixxx.freya.Alerts
 import com.japaneixxx.freya.BalanceWidget
+import com.japaneixxx.freya.CalendarSync
+import com.japaneixxx.freya.Shortcuts
 import com.japaneixxx.freya.Biometric
 import com.japaneixxx.freya.data.*
 import kotlinx.coroutines.Dispatchers
@@ -122,16 +125,72 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
     var pinEnabled by mutableStateOf(settings.hasPin)
     var alertsEnabled by mutableStateOf(settings.alertsEnabled)
     var checkUpdatesOnOpen by mutableStateOf(settings.checkUpdatesOnOpen)
+    var calendarEnabled by mutableStateOf(settings.calendarEnabled)
+    var calendarBills by mutableStateOf(settings.calendarBills)
+    var calendarShowAmount by mutableStateOf(settings.calendarShowAmount)
+    var calendarLeadDays by mutableStateOf(settings.calendarLeadDays)
+    var calendarLabel by mutableStateOf(settings.calendarLabel)
     var themeMode by mutableStateOf(settings.themeMode)
+
+    // ---- Aparência, abas e atalhos personalizados ----
+    var accent by mutableIntStateOf(settings.accentColor)
+    var fontScalePct by mutableIntStateOf(settings.fontScalePct)
+    var uiDensity by mutableIntStateOf(settings.uiDensity)
+    var startTab by mutableIntStateOf(settings.startTab)
+    var tabOrder by mutableStateOf(parseTabOrder(settings.tabOrder))
+    var shortcutIds by mutableStateOf(parseShortcutIds(settings.shortcutIds))
+    /** Destino pedido por um atalho ou widget; o App consome depois do desbloqueio. */
+    var pendingLink by mutableStateOf<DeepLink?>(null)
+    /** Pedido para abrir a tela de novo lançamento (atalho "Novo lançamento"). */
+    var addRequest by mutableStateOf(false)
+
+    /** Muda a cor só na tela, enquanto o usuário arrasta os controles; use [setAccent] para gravar. */
+    fun previewAccent(argb: Int) { accent = argb }
+    fun setAccent(argb: Int) {
+        settings.accentColor = argb
+        accent = argb
+        BalanceWidget.refresh(app)
+    }
+    fun setFontScalePct(pct: Int) { settings.fontScalePct = pct; fontScalePct = settings.fontScalePct }
+    fun setUiDensity(level: Int) { settings.uiDensity = level; uiDensity = settings.uiDensity }
+    fun setStartTab(tab: Int) { settings.startTab = tab; startTab = settings.startTab }
+    fun updateTabOrder(order: List<Int>) { tabOrder = order; settings.tabOrder = encodeTabOrder(order) }
+    fun setShortcuts(ids: List<String>) {
+        val clean = ids.distinct().take(MAX_SHORTCUTS)
+        shortcutIds = clean
+        settings.shortcutIds = clean.joinToString(",")
+        Shortcuts.publish(app, clean)
+    }
+
+    // ---- Início personalizável ----
+    var homeLayout by mutableStateOf(parseHomeLayout(settings.homeLayout))
+    fun updateHomeLayout(layout: List<HomeBlock>) {
+        homeLayout = layout
+        settings.homeLayout = encodeHomeLayout(layout)
+    }
+
+    // ---- Fatura por ciclo ----
+    fun closingDayFor(id: String): Int? = settings.cardClosingDay(id)
+    fun bankClosingDayFor(id: String): Int? =
+        settings.cardCloseDates()[id]?.let { runCatching { java.time.LocalDate.parse(it).dayOfMonth }.getOrNull() }
+    fun setCardClosingDay(id: String, day: Int?) = settings.setCardClosingDay(id, day)
+
+    // ---- Tutorial do primeiro acesso ----
+    var tourActive by mutableStateOf(settings.tourPending)
+    var tourStep by mutableIntStateOf(0)
+    fun startTour() { tourStep = 0; settings.tourPending = true; tourActive = true }
+    fun finishTour() { settings.tourPending = false; tourActive = false; tourStep = 0 }
     var updateRelease by mutableStateOf<UpdateRelease?>(null)
     var checkingUpdate by mutableStateOf(false)
     var downloadingUpdate by mutableStateOf(false)
 
     fun saveCredentials(clientId: String, secret: String, itemIds: String) {
+        val firstAccess = !settings.configured
         settings.clientId = clientId
         settings.clientSecret = secret
         settings.itemIds = itemIds
         configured = settings.configured
+        if (firstAccess && configured) startTour()
         sync()
     }
 
@@ -197,6 +256,7 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
                 withContext(Dispatchers.IO) { settings.pruneSeen() }
                 BalanceWidget.refresh(app)
                 Alerts.check(app)
+                syncCalendar()
             } catch (e: UnknownHostException) {
                 message = "Sem conexão com a internet"
             } catch (e: Exception) {
@@ -282,6 +342,48 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
         alertsEnabled = enabled
         Alerts.schedule(app, enabled)
         if (enabled) viewModelScope.launch { Alerts.check(app) }
+    }
+
+    // ---- Agenda do celular ----
+    fun setCalendarEnabled(enabled: Boolean) {
+        if (enabled && !CalendarSync.hasPermission(app)) {
+            message = "Permita o acesso à agenda para ativar os lembretes"
+            return
+        }
+        settings.calendarEnabled = enabled
+        calendarEnabled = enabled
+        if (enabled) syncCalendar(announce = true)
+        else viewModelScope.launch {
+            runCatching { withContext(Dispatchers.IO) { CalendarSync.clear(app) } }
+                .onFailure { message = "Não foi possível remover os lembretes da agenda" }
+        }
+    }
+
+    fun setCalendarBills(on: Boolean) { settings.calendarBills = on; calendarBills = on; syncCalendar() }
+    fun setCalendarShowAmount(on: Boolean) { settings.calendarShowAmount = on; calendarShowAmount = on; syncCalendar() }
+    fun setCalendarLeadDays(days: Int) { settings.calendarLeadDays = days; calendarLeadDays = settings.calendarLeadDays; syncCalendar() }
+
+    /** Idempotente: cria, atualiza e remove os lembretes conforme os vencimentos atuais. */
+    fun syncCalendar(announce: Boolean = false) {
+        if (!settings.calendarEnabled) return
+        viewModelScope.launch {
+            try {
+                val r = withContext(Dispatchers.IO) { CalendarSync.sync(app) }
+                calendarLabel = settings.calendarLabel
+                if (announce && r != null) {
+                    message = when {
+                        r.total == 0 -> "Agenda ligada. Nenhuma fatura a vencer nos próximos 60 dias por enquanto."
+                        else -> "Agenda ligada: ${r.total} vencimento(s) no calendário ${r.calendar}."
+                    }
+                }
+            } catch (e: SecurityException) {
+                settings.calendarEnabled = false
+                calendarEnabled = false
+                message = "O acesso à agenda foi removido; os lembretes foram desligados"
+            } catch (e: Exception) {
+                message = "Não foi possível atualizar a agenda do celular: ${e.message ?: "erro desconhecido"}"
+            }
+        }
     }
 
     fun updateCheckUpdatesOnOpen(enabled: Boolean) {

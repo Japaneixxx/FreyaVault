@@ -61,6 +61,35 @@ class Settings(ctx: Context) {
     var alertPromptShown: Boolean
         get() = bool("alert_prompt_shown")
         set(v) = put("alert_prompt_shown", v)
+    // Integração com a agenda do celular (lembretes de fatura e contas a pagar).
+    var calendarEnabled: Boolean get() = bool("cal_on"); set(v) = put("cal_on", v)
+    var calendarBills: Boolean get() = bool("cal_bills"); set(v) = put("cal_bills", v)
+    var calendarShowAmount: Boolean get() = bool("cal_amount"); set(v) = put("cal_amount", v)
+
+    /** Quantos dias antes do vencimento o primeiro lembrete toca (0 = só no dia). */
+    var calendarLeadDays: Int
+        get() = prefs.getInt("cal_lead", 1)
+        set(v) { prefs.edit().putInt("cal_lead", v.coerceIn(0, 7)).apply() }
+    var calendarId: Long
+        get() = prefs.getLong("cal_id", -1L)
+        set(v) { prefs.edit().putLong("cal_id", v).apply() }
+
+    /** Nome do calendário usado, para mostrar na tela (ex.: "Freya (só neste aparelho)"). */
+    var calendarLabel: String get() = str("cal_label"); set(v) = put("cal_label", v)
+
+    /** Eventos criados pelo Freya: chave do vencimento -> id do evento (-1 = o usuário apagou, não recriar). */
+    fun calendarEvents(): Map<String, Long> {
+        val raw = str("cal_events")
+        if (raw.isBlank()) return emptyMap()
+        return runCatching {
+            val o = org.json.JSONObject(raw)
+            o.keys().asSequence().associateWith { o.getLong(it) }
+        }.getOrDefault(emptyMap())
+    }
+
+    fun saveCalendarEvents(map: Map<String, Long>) =
+        put("cal_events", if (map.isEmpty()) "" else org.json.JSONObject(map).toString())
+
     var checkUpdatesOnOpen: Boolean
         get() = prefs.getBoolean("check_updates_on_open", true)
         set(v) = put("check_updates_on_open", v)
@@ -111,6 +140,94 @@ class Settings(ctx: Context) {
     }
 
     fun clearAccountAliases() = saveAccountAliases(emptyMap())
+
+    // ---- Fatura por ciclo: dia de fechamento de cada cartão ----
+    /** Data de fechamento informada pelo banco (Pluggy), por cartão: id -> yyyy-MM-dd. */
+    fun cardCloseDates(): Map<String, String> = readStringMap("card_close_dates")
+
+    fun putCardCloseDate(id: String, date: String) {
+        val m = cardCloseDates()
+        if (m[id] == date) return
+        saveStringMap("card_close_dates", m + (id to date))
+    }
+
+    /** Dia de fechamento escolhido pelo usuário (vale mais que o do banco): id -> dia (1..31). */
+    fun cardClosingDayOverrides(): Map<String, Int> = readStringMap("card_close_days").mapNotNull { (k, v) -> v.toIntOrNull()?.let { k to it } }.toMap()
+
+    fun setCardClosingDay(id: String, day: Int?) {
+        val m = readStringMap("card_close_days").toMutableMap()
+        if (day == null) m.remove(id) else m[id] = day.coerceIn(1, 31).toString()
+        saveStringMap("card_close_days", m)
+    }
+
+    /** Dia de fechamento a usar: o do usuário, senão o informado pelo banco; nulo se nenhum. */
+    fun cardClosingDay(id: String): Int? =
+        cardClosingDayOverrides()[id]
+            ?: cardCloseDates()[id]?.let { runCatching { java.time.LocalDate.parse(it).dayOfMonth }.getOrNull() }
+
+    private fun readStringMap(key: String): Map<String, String> {
+        val raw = str(key)
+        if (raw.isBlank()) return emptyMap()
+        return runCatching {
+            val o = org.json.JSONObject(raw)
+            o.keys().asSequence().associateWith { o.getString(it) }
+        }.getOrDefault(emptyMap())
+    }
+
+    private fun saveStringMap(key: String, map: Map<String, String>) =
+        put(key, if (map.isEmpty()) "" else org.json.JSONObject(map).toString())
+
+    // ---- Aparência e navegação personalizadas ----
+    /** Cor de destaque em ARGB; 0 = cor padrão do Freya. */
+    var accentColor: Int
+        get() = prefs.getInt("accent", 0)
+        set(v) { prefs.edit().putInt("accent", v).apply() }
+
+    /** Tamanho do texto em porcentagem (80 a 140). */
+    var fontScalePct: Int
+        get() = prefs.getInt("font_pct", 100).coerceIn(80, 140)
+        set(v) { prefs.edit().putInt("font_pct", v.coerceIn(80, 140)).apply() }
+
+    /** 0 compacto, 1 padrão, 2 confortável. */
+    var uiDensity: Int
+        get() = prefs.getInt("ui_density", 1).coerceIn(0, 2)
+        set(v) { prefs.edit().putInt("ui_density", v.coerceIn(0, 2)).apply() }
+
+    /** Aba que abre com o app: 0 Início, 1 Extrato, 2 Patrimônio, 3 Planejar, 4 Mais. */
+    var startTab: Int
+        get() = prefs.getInt("start_tab", 0).coerceIn(0, 4)
+        set(v) { prefs.edit().putInt("start_tab", v.coerceIn(0, 4)).apply() }
+
+    /** Ordem das abas na barra de baixo, no formato "0,1,2,3,4". */
+    var tabOrder: String get() = str("tab_order"); set(v) = put("tab_order", v)
+
+    /** Atalhos ao segurar o ícone do app, separados por vírgula. */
+    var shortcutIds: String
+        get() = prefs.getString("shortcuts", "add,agenda") ?: "add,agenda"
+        set(v) = put("shortcuts", v)
+
+    /** Opções de cada widget de saldo, por id do widget. */
+    fun widgetConfig(id: Int): WidgetConfig {
+        val raw = str("widget_cfg_$id")
+        if (raw.isBlank()) return WidgetConfig()
+        return runCatching {
+            val o = org.json.JSONObject(raw)
+            WidgetConfig(o.optString("show", "BOTH"), o.optString("style", "APP"), o.optString("opens", "home"))
+        }.getOrDefault(WidgetConfig())
+    }
+
+    fun setWidgetConfig(id: Int, c: WidgetConfig) =
+        put("widget_cfg_$id", org.json.JSONObject().put("show", c.show).put("style", c.style).put("opens", c.opens).toString())
+
+    fun deleteWidgetConfig(id: Int) { prefs.edit().remove("widget_cfg_$id").apply() }
+
+    // ---- Início personalizável ----
+    /** Ordem e visibilidade dos blocos do início, no formato "id:1,id:0" (vazio = padrão). */
+    var homeLayout: String get() = str("home_layout"); set(v) = put("home_layout", v)
+
+    // ---- Tutorial do primeiro acesso ----
+    /** Verdadeiro até o usuário concluir ou pular o tutorial. Só nasce ligado em instalação nova ou ao pedir "Rever tutorial". */
+    var tourPending: Boolean get() = bool("tour_pending"); set(v) = put("tour_pending", v)
 
     fun setPin(pin: String) {
         val salt = PinHasher.newSalt()
@@ -198,3 +315,6 @@ class Settings(ctx: Context) {
     fun itemList(): List<String> =
         itemIds.split(Regex("[,;\\s]+")).map { it.trim() }.filter { it.isNotBlank() }.distinct()
 }
+
+/** Como um widget de saldo se comporta. [show]: BOTH | BANK | CARDS. [style]: APP | DARK | LIGHT | CLEAR. [opens]: id de um destino. */
+data class WidgetConfig(val show: String = "BOTH", val style: String = "APP", val opens: String = "home")

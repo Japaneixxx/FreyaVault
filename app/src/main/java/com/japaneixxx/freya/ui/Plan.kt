@@ -55,7 +55,7 @@ fun PlanScreen(vm: AppViewModel, section: Int, onSection: (Int) -> Unit) {
     Column(Modifier.fillMaxSize()) {
         Text("Planejar", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(start = 16.dp, top = 12.dp))
         Row(
-            Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
+            Modifier.tourTarget("plan_tabs").horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             listOf("Orçamentos", "Metas", "Compromissos", "Agenda", "Cartões", "Parcelas", "Recorrentes", "Cobranças").forEachIndexed { i, l ->
@@ -673,6 +673,7 @@ private fun CommitmentSheet(existing: Bill?, onDismiss: () -> Unit, onDelete: ((
 private fun CardsSection(vm: AppViewModel) {
     val accounts by vm.accounts.collectAsState()
     val cards = accounts.filter { it.type == "CREDIT" }
+    val cardTxs by vm.txs.collectAsState()
     var renamingCard by remember { mutableStateOf<com.japaneixxx.freya.data.Account?>(null) }
     renamingCard?.let { card -> RenameAccountDialog(vm, card) { renamingCard = null } }
 
@@ -718,6 +719,7 @@ private fun CardsSection(vm: AppViewModel) {
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                CardCycleBlock(vm, c, cardTxs)
             }
         }
     }

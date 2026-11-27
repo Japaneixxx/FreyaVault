@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import com.japaneixxx.freya.Alerts
 import com.japaneixxx.freya.Biometric
+import com.japaneixxx.freya.CalendarSync
 import com.japaneixxx.freya.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -82,6 +83,11 @@ fun MoreScreen(vm: AppViewModel) {
             vm.message = "Permissão de notificações negada"
             Alerts.openNotificationSettings(ctx)
         }
+    }
+
+    val calendarPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+        if (result.values.isNotEmpty() && result.values.all { it }) vm.setCalendarEnabled(true)
+        else vm.message = "Permissão da agenda negada"
     }
 
     Column(
@@ -155,14 +161,58 @@ fun MoreScreen(vm: AppViewModel) {
             SwitchRow("Ocultar valores", "Esconde saldos e valores em todo o app.", Privacy.hidden) { vm.toggleHide() }
         }
 
-        SectionTitle("Aparência")
+        SectionTitle("Agenda do celular")
         NCard(Modifier.fillMaxWidth()) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("Sistema", "Claro", "Escuro").forEachIndexed { i, l ->
-                    FilterChip(selected = vm.themeMode == i, onClick = { vm.setTheme(i) }, label = { Text(l) })
+            SwitchRow(
+                "Lembretes na agenda",
+                "Coloca o vencimento das faturas dos cartões no calendário do celular, com aviso antes e no dia.",
+                vm.calendarEnabled
+            ) { on ->
+                if (!on) vm.setCalendarEnabled(false)
+                else if (CalendarSync.hasPermission(ctx)) vm.setCalendarEnabled(true)
+                else runCatching { calendarPermission.launch(CalendarSync.PERMISSIONS) }
+                    .onFailure { vm.message = "Não foi possível solicitar a permissão da agenda" }
+            }
+            if (vm.calendarEnabled) {
+                Spacer(Modifier.height(10.dp))
+                Text("Primeiro aviso", style = MaterialTheme.typography.bodyMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(0 to "No dia", 1 to "1 dia antes", 2 to "2 dias", 3 to "3 dias").forEach { (d, l) ->
+                        FilterChip(selected = vm.calendarLeadDays == d, onClick = { vm.setCalendarLeadDays(d) }, label = { Text(l) })
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                SwitchRow("Incluir contas a pagar", "Também cria lembretes dos compromissos cadastrados em Planejar.", vm.calendarBills) { vm.setCalendarBills(it) }
+                Spacer(Modifier.height(10.dp))
+                SwitchRow(
+                    "Mostrar o valor no lembrete",
+                    "Desligado por padrão: o evento só diz qual fatura vence. Fica desligado com valores ocultos ou bloqueio ativo.",
+                    vm.calendarShowAmount
+                ) { vm.setCalendarShowAmount(it) }
+                if (vm.calendarLabel.isNotBlank()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Calendário usado: ${vm.calendarLabel}",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
+
+        SectionTitle("Ajuda")
+        NCard(Modifier.fillMaxWidth()) {
+            Text("Tutorial", style = MaterialTheme.typography.bodyLarge)
+            Text("Um passeio rápido pelas abas do app, tocando nos destaques.", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(onClick = { vm.startTour() }) { Text("Rever tutorial") }
+        }
+
+        SectionTitle("Aparência")
+        AppearanceCard(vm)
+
+        SectionTitle("Abas, atalhos e widget")
+        TabsAndShortcutsCard(vm)
 
         SectionTitle("Dados")
         NCard(Modifier.fillMaxWidth()) {

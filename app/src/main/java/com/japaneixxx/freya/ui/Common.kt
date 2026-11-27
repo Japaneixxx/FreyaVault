@@ -4,6 +4,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -35,6 +36,7 @@ import com.japaneixxx.freya.data.BUDGET_CATEGORIES
 import com.japaneixxx.freya.data.CAT_CARD_PAYMENT
 import com.japaneixxx.freya.data.CAT_OWN_TRANSFER
 import com.japaneixxx.freya.data.TxKind
+import java.time.LocalDate
 import java.time.YearMonth
 
 /** Categorias padrão + as criadas pelo usuário. */
@@ -302,37 +304,138 @@ fun Mountains(modifier: Modifier = Modifier) {
     }
 }
 
-/** Calendário do mês: cada dia fica mais escuro quanto maior o gasto. */
+/**
+ * Calendário do mês em cores: dia avermelhado = saiu mais do que entrou; dia verde-azulado = entrou mais do que saiu.
+ * Quanto mais forte a cor, maior o saldo do dia (comparado ao melhor/pior dia do mês). Toque num dia para ver os lançamentos.
+ */
 @Composable
-fun SpendHeatmap(ym: YearMonth, perDay: Map<Int, Double>, modifier: Modifier = Modifier) {
-    val max = (perDay.values.maxOrNull() ?: 0.0).coerceAtLeast(1.0)
+fun SpendHeatmap(ym: YearMonth, flows: Map<Int, DayFlow>, items: List<TxItem>, modifier: Modifier = Modifier) {
+    var selected by remember(ym) { mutableStateOf<Int?>(null) }
+    val maxOut = flows.values.filter { it.net < -0.005 }.maxOfOrNull { -it.net } ?: 0.0
+    val maxIn = flows.values.filter { it.net > 0.005 }.maxOfOrNull { it.net } ?: 0.0
+    val redDays = flows.values.count { it.net < -0.005 }
+    val greenDays = flows.values.count { it.net > 0.005 }
+    val today = LocalDate.now().takeIf { YearMonth.from(it) == ym }?.dayOfMonth
     val lead = ym.atDay(1).dayOfWeek.value % 7 // domingo = 0
     val cells = List(lead) { 0 } + (1..ym.lengthOfMonth()).toList()
     val padded = cells + List((7 - cells.size % 7) % 7) { 0 }
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(Modifier.fillMaxWidth()) {
+    val shape = RoundedCornerShape(12.dp)
+
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(10.dp).background(ExpenseColor, CircleShape))
+                Spacer(Modifier.width(6.dp))
+                Text("$redDays dia(s) com mais saídas", style = MaterialTheme.typography.labelMedium)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(10.dp).background(IncomeColor, CircleShape))
+                Spacer(Modifier.width(6.dp))
+                Text("$greenDays com mais entradas", style = MaterialTheme.typography.labelMedium)
+            }
+        }
+        Spacer(Modifier.height(2.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             listOf("D", "S", "T", "Q", "Q", "S", "S").forEach {
                 Text(it, Modifier.weight(1f), textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         padded.chunked(7).forEach { week ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 week.forEach { day ->
                     if (day == 0) {
-                        Spacer(Modifier.weight(1f).aspectRatio(1f))
+                        Spacer(Modifier.weight(1f).aspectRatio(0.78f))
                     } else {
-                        val v = perDay[day] ?: 0.0
-                        val bg = if (v <= 0) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-                        else MaterialTheme.colorScheme.primary.copy(alpha = 0.18f + 0.62f * (v / max).toFloat())
+                        val flow = flows[day]
+                        val net = flow?.net ?: 0.0
+                        val base = when { net < -0.005 -> ExpenseColor; net > 0.005 -> IncomeColor; else -> null }
+                        val strength = when {
+                            net < -0.005 && maxOut > 0 -> (-net / maxOut).toFloat()
+                            net > 0.005 && maxIn > 0 -> (net / maxIn).toFloat()
+                            else -> 0f
+                        }
+                        val bg = base?.copy(alpha = 0.2f + 0.65f * strength)
+                            ?: MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (flow == null) 0.45f else 0.9f)
+                        val textColor = if (base != null && strength > 0.5f) Color.White else MaterialTheme.colorScheme.onSurface
+                        val border = when (day) {
+                            selected -> Modifier.border(2.dp, MaterialTheme.colorScheme.primary, shape)
+                            today -> Modifier.border(1.dp, MaterialTheme.colorScheme.outline, shape)
+                            else -> Modifier
+                        }
                         Box(
-                            Modifier.weight(1f).aspectRatio(1f).background(bg, RoundedCornerShape(10.dp)),
+                            Modifier.weight(1f).aspectRatio(0.78f).clip(shape).background(bg).then(border)
+                                .clickable { selected = if (selected == day) null else day },
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("$day", style = MaterialTheme.typography.labelSmall,
-                                color = if (v / max > 0.55) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant)
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("$day", style = MaterialTheme.typography.labelLarge, color = textColor)
+                                if (flow != null && !Privacy.hidden) {
+                                    Text(compactMoney(net), fontSize = 10.sp, maxLines = 1, color = textColor.copy(alpha = 0.9f))
+                                }
+                            }
                         }
                     }
+                }
+            }
+        }
+
+        // legenda
+        Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("Mais saídas", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.width(8.dp))
+            Box(
+                Modifier.weight(1f).height(8.dp).clip(CircleShape).background(
+                    Brush.horizontalGradient(
+                        listOf(ExpenseColor, ExpenseColor.copy(alpha = 0.25f),
+                            MaterialTheme.colorScheme.surfaceVariant, IncomeColor.copy(alpha = 0.25f), IncomeColor)
+                    )
+                )
+            )
+            Spacer(Modifier.width(8.dp))
+            Text("Mais entradas", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+
+        // detalhe do dia tocado
+        selected?.let { d ->
+            val flow = flows[d]
+            val dayItems = items.filter { it.tx.date.takeLast(2).toIntOrNull() == d }.sortedBy { it.tx.amount }
+            Column(
+                Modifier.fillMaxWidth().padding(top = 8.dp).clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)).padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(dayLabel(ym.atDay(d).toString()), style = MaterialTheme.typography.titleSmall)
+                if (flow == null) {
+                    Text("Sem lançamentos neste dia.", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Column {
+                            Text("Entrou", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(money(flow.income), color = IncomeColor, style = MaterialTheme.typography.bodyMedium)
+                        }
+                        Column {
+                            Text("Saiu", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(money(flow.expense), color = ExpenseColor, style = MaterialTheme.typography.bodyMedium)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("Saldo do dia", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(money(flow.net), style = MaterialTheme.typography.bodyMedium,
+                                color = if (flow.net < 0) ExpenseColor else IncomeColor)
+                        }
+                    }
+                    dayItems.take(6).forEach { it2 ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(it2.clean.title.ifBlank { it2.tx.description }, Modifier.weight(1f).padding(end = 8.dp),
+                                style = MaterialTheme.typography.bodySmall, maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                            Text(money(it2.tx.amount), style = MaterialTheme.typography.bodySmall,
+                                color = if (it2.tx.amount < 0) ExpenseColor else IncomeColor)
+                        }
+                    }
+                    if (dayItems.size > 6) Text("e mais ${dayItems.size - 6} lançamento(s)", style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }

@@ -26,6 +26,22 @@ investimentos diretamente no aparelho.
   % do CDI ou IPCA + taxa (CDI e IPCA digitados ou buscados na API pública do Banco Central), IR regressivo,
   meta reversa e comparação de cenários.
 - Alertas locais de orçamento, contas a pagar, faturas e saldo previsto.
+- Agenda do celular: em Mais > Agenda do celular, o Freya cria lembretes com o vencimento das faturas (e,
+  opcionalmente, das contas a pagar) num calendário local "Freya", que não sobe para a conta Google. Pede as
+  permissões de leitura e escrita da agenda; se o aparelho não deixar criar o calendário local, usa um calendário
+  editável existente e mostra qual na tela. O valor só entra no evento se você ligar a opção. Desligar remove os
+  lembretes futuros.
+- Personalização: cor de destaque (paletas ou cor livre, com ajuste automático de contraste), tamanho do texto
+  (80% a 140%), densidade da interface, aba inicial e ordem das abas, atalhos do ícone do app (até 4) e widget de
+  saldo configurável por widget (conteúdo, estilo e destino do toque). As escolhas ficam só neste aparelho.
+- Fatura por ciclo: em Planejar > Cartões, informe o dia de fechamento de cada cartão (ou use a data que o Pluggy
+  envia em `balanceCloseDate`) para ver o ciclo atual e os anteriores, com total, categorias e lançamentos. O total
+  vem dos lançamentos do extrato (sem os pagamentos de fatura) e pode diferir do valor oficial; compras no dia do
+  fechamento contam no ciclo seguinte. O dia de fechamento informado fica só neste aparelho e não entra no backup.
+- Início personalizável: o botão Personalizar início, no fim da tela Início, liga, desliga e reordena os blocos.
+- Tutorial interativo: aparece no primeiro acesso, depois de conectar o Pluggy, e pode ser revisto em Mais > Ajuda.
+- Calendário de gastos na Visão geral: cada dia fica vermelho (saiu mais) ou verde-azulado (entrou mais) conforme
+  o saldo do dia; tocar no dia mostra entradas, saídas e lançamentos.
 - Widget de saldo, tema claro/escuro/sistema e modo para ocultar valores.
 - Exportação CSV, resumo mensal compartilhável e backup/restauração em JSON, com senha opcional (AES-256).
 - Dinheiro físico: em Mais > Dinheiro físico, crie contas de dinheiro vivo; o saldo acompanha os lançamentos

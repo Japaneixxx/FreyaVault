@@ -77,9 +77,20 @@ private val NordicShapes = Shapes(
 )
 
 @Composable
-fun AppTheme(mode: Int = 0, content: @Composable () -> Unit) {
+fun AppTheme(
+    mode: Int = 0, accent: Int = 0, fontScalePct: Int = 100, density: Int = 1,
+    content: @Composable () -> Unit
+) {
     val dark = when (mode) { 1 -> false; 2 -> true; else -> isSystemInDarkTheme() }
-    val colorScheme = if (dark) DarkScheme else LightScheme
+    val base = if (dark) DarkScheme else LightScheme
+    val colorScheme = if (accent == 0) base else accentColors(accent, dark).let { a ->
+        base.copy(
+            primary = Color(a.primary), onPrimary = Color(a.onPrimary),
+            primaryContainer = Color(a.primaryContainer), onPrimaryContainer = Color(a.onPrimaryContainer),
+            secondary = Color(a.secondary), onSecondary = Color(a.onSecondary),
+            secondaryContainer = Color(a.secondaryContainer), onSecondaryContainer = Color(a.onSecondaryContainer)
+        )
+    }
     val view = LocalView.current
 
     SideEffect {
@@ -92,12 +103,14 @@ fun AppTheme(mode: Int = 0, content: @Composable () -> Unit) {
         }
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = NordicTypography,
-        shapes = NordicShapes,
-        content = content
-    )
+    PersonalizedDensity(fontScalePct, density) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = NordicTypography,
+            shapes = NordicShapes,
+            content = content
+        )
+    }
 }
 
 /** Cartão nórdico: borda fina, cantos generosos e resposta elástica ao toque. */

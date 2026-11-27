@@ -1,5 +1,6 @@
 package com.japaneixxx.freya.ui
 
+import com.japaneixxx.freya.data.Account
 import com.japaneixxx.freya.data.Bill
 import com.japaneixxx.freya.data.BillPayment
 import com.japaneixxx.freya.data.Budget
@@ -115,5 +116,49 @@ class InsightsTest {
         assertEquals(LocalDate.of(2026, 11, 6), d)
         assertFalse(d.dayOfWeek == DayOfWeek.SATURDAY || d.dayOfWeek == DayOfWeek.SUNDAY)
         assertEquals(LocalDate.of(2026, 11, 10), incomeDate(Income(1, "X", 1.0, 10, false), YearMonth.of(2026, 11)))
+    }
+
+    // ---- calendário de gastos: entradas x saídas por dia ----
+    @Test fun dayFlowsSeparateIncomeAndExpensePerDay() {
+        val items = listOf(
+            spend("2026-11-03", -80.0), spend("2026-11-03", -20.0),
+            TxItem(tx("in", "A", "Salário", 500.0, "2026-11-03"), "Salário"),
+            TxItem(tx("in2", "A", "Pix", 40.0, "2026-11-10"), "Outros")
+        )
+        val f = dayFlows(items)
+        assertEquals(500.0, f.getValue(3).income, 0.001)
+        assertEquals(100.0, f.getValue(3).expense, 0.001)
+        assertEquals(400.0, f.getValue(3).net, 0.001)
+        assertEquals(40.0, f.getValue(10).net, 0.001)
+        assertFalse(f.containsKey(4))
+    }
+
+    // ---- agenda do celular ----
+    private fun card(id: String, balance: Double, due: String?) =
+        Account(id, "i", "Nubank", "Roxinho", "CREDIT", "CREDIT_CARD", balance, "BRL", dueDate = due)
+
+    @Test fun calendarWishesListsOnlyUpcomingCardsWithBalance() {
+        val today = LocalDate.of(2026, 11, 26)
+        val w = calendarWishes(
+            listOf(card("a", 300.0, "2026-12-05"), card("b", 0.0, "2026-12-06"), card("c", 90.0, "2026-11-01"), card("d", 50.0, "2027-03-01")),
+            emptyList(), emptyList(), emptyMap(), false, null, today
+        )
+        assertEquals(listOf("card:a:2026-12-05"), w.map { it.key })
+        assertFalse(w.first().description.contains("R$"))
+    }
+
+    @Test fun calendarWishesWritesAmountOnlyWhenAsked() {
+        val today = LocalDate.of(2026, 11, 26)
+        val w = calendarWishes(listOf(card("a", 300.0, "2026-12-05")), emptyList(), emptyList(), emptyMap(), false, { "R$ ${it.toInt()}" }, today)
+        assertTrue(w.first().description.contains("R$ 300"))
+    }
+
+    @Test fun calendarWishesIncludesBillsOnlyWhenEnabled() {
+        val today = LocalDate.of(2026, 11, 26)
+        val bill = Bill(id = 7, name = "Internet", amount = 100.0, dueDay = 28)
+        val off = calendarWishes(emptyList(), listOf(bill), emptyList(), emptyMap(), false, null, today)
+        val on = calendarWishes(emptyList(), listOf(bill), emptyList(), emptyMap(), true, null, today)
+        assertTrue(off.isEmpty())
+        assertEquals("bill:7:2026-11-28", on.first().key)
     }
 }

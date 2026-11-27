@@ -30,10 +30,18 @@ class MainActivity : FragmentActivity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        Shortcuts.linkFrom(intent)?.let { vm.pendingLink = it }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (savedInstanceState == null) Shortcuts.linkFrom(intent)?.let { vm.pendingLink = it }
+        Shortcuts.publish(this, vm.shortcutIds)
         setContent {
-            AppTheme(vm.themeMode) {
+            AppTheme(vm.themeMode, vm.accent, vm.fontScalePct, vm.uiDensity) {
                 App(
                     vm,
                     onUnlock = { unlock() },
@@ -64,6 +72,7 @@ class MainActivity : FragmentActivity() {
         }
 
         vm.syncIfStale()
+        vm.syncCalendar()
         if (vm.checkUpdatesOnOpen) vm.checkForUpdate(showNoUpdate = false)
     }
 

@@ -389,3 +389,52 @@ fun effectiveBudgets(budgets: List<Budget>, envelopes: List<Envelope>, real: Lis
         EffectiveBudget(b.category, b.limitAmount, if (e != null) envelopeCarry(b.category, b.limitAmount, e.startMonth, real) else 0.0, e != null)
     }
 }
+
+// ---------------- Agenda do celular: o que vira lembrete ----------------
+/** Um vencimento que o Freya quer ter na agenda do celular. [key] identifica o vencimento (termina com a data). */
+data class CalendarWish(val key: String, val date: LocalDate, val title: String, val description: String)
+
+/**
+ * Vencimentos de hoje até [horizonDays] dias à frente: faturas de cartão com valor a pagar e, se [includeBills],
+ * contas a pagar do mês. [amountText] formata o valor (nulo = não escrever o valor no lembrete).
+ */
+fun calendarWishes(
+    accounts: List<Account>, bills: List<Bill>, payments: List<BillPayment>,
+    aliases: Map<String, String>, includeBills: Boolean, amountText: ((Double) -> String)?,
+    today: LocalDate = LocalDate.now(), horizonDays: Long = 60
+): List<CalendarWish> {
+    val limit = today.plusDays(horizonDays)
+    val out = mutableListOf<CalendarWish>()
+    accounts.filter { it.type == "CREDIT" && it.balance > 0 }.forEach { a ->
+        val d = a.dueDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return@forEach
+        if (d.isBefore(today) || d.isAfter(limit)) return@forEach
+        val card = aliases[a.id] ?: a.name
+        val value = amountText?.let { "\nValor da fatura: ${it(a.balance)}" } ?: ""
+        out += CalendarWish("card:${a.id}:$d", d, "Pagar fatura ${a.institution}", "Cartão $card.$value\nCriado pelo Freya.")
+    }
+    if (includeBills) {
+        (0..2).map { YearMonth.from(today).plusMonths(it.toLong()) }.forEach { ym ->
+            bills.forEach { b ->
+                if (!isBillActive(b, ym)) return@forEach
+                if (ym == YearMonth.from(today) && b.lastPaidMonth == ym.toString()) return@forEach
+                val d = billDueDate(b, ym)
+                if (d.isBefore(today) || d.isAfter(limit)) return@forEach
+                val value = amountText?.let { "\nValor: ${if (b.kind == KIND_VARIABLE) "cerca de " else ""}${it(billEstimate(b, payments))}" } ?: ""
+                out += CalendarWish("bill:${b.id}:$d", d, "Pagar ${b.name}", "Conta a pagar.$value\nCriado pelo Freya.")
+            }
+        }
+    }
+    return out.sortedBy { it.date }
+}
+
+// ---------------- Calendário de gastos: entradas x saídas por dia ----------------
+/** Movimento de um dia: soma das entradas e das saídas (positivas). */
+data class DayFlow(val income: Double, val expense: Double) {
+    val net: Double get() = income - expense
+}
+
+/** Agrupa os lançamentos (já filtrados para o mês e sem os ignorados) pelo dia do mês. */
+fun dayFlows(items: List<TxItem>): Map<Int, DayFlow> =
+    items.groupBy { it.tx.date.takeLast(2).toIntOrNull() ?: 0 }
+        .filterKeys { it in 1..31 }
+        .mapValues { (_, l) -> DayFlow(l.incomeSum(), l.expenseSum()) }
