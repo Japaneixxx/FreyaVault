@@ -23,6 +23,13 @@ data class ReleaseNote(
  */
 val releaseNotes: List<ReleaseNote> = listOf(
     ReleaseNote(
+        "1.10.3", "Recebimentos avulsos",
+        listOf(
+            "Corrigido um erro que repetia o mesmo recebimento avulso na agenda.",
+            "Agora é possível escolher várias datas ao cadastrar um recebimento avulso; o valor informado vale para cada dia."
+        )
+    ),
+    ReleaseNote(
         "1.10.2", "Segurança configurável",
         listOf("A proteção contra capturas e gravações de tela agora tem um controle separado do bloqueio por biometria ou PIN.")
     ),

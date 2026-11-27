@@ -972,20 +972,21 @@ private fun AgendaSection(vm: AppViewModel) {
 
     if (creating) IncomeSheet(null, { creating = false }) { vm.saveIncome(it) }
     editing?.let { i -> IncomeSheet(i, { editing = null }, onDelete = { vm.deleteIncome(i) }) { vm.saveIncome(it) } }
-    if (creatingOneTime) OneTimeIncomeSheet(null, { creatingOneTime = false }) { vm.saveOneTimeIncome(it) }
+    if (creatingOneTime) OneTimeIncomeSheet(null, { creatingOneTime = false }) { vm.saveOneTimeIncomes(it) }
     editingOneTime?.let { i ->
-        OneTimeIncomeSheet(i, { editingOneTime = null }, onDelete = { vm.deleteOneTimeIncome(i) }) { vm.saveOneTimeIncome(it) }
+        OneTimeIncomeSheet(i, { editingOneTime = null }, onDelete = { vm.deleteOneTimeIncome(i) }) { vm.saveOneTimeIncomes(it) }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun OneTimeIncomeSheet(
-    existing: OneTimeIncome?, onDismiss: () -> Unit, onDelete: (() -> Unit)? = null, onSave: (OneTimeIncome) -> Unit
+    existing: OneTimeIncome?, onDismiss: () -> Unit, onDelete: (() -> Unit)? = null, onSave: (List<OneTimeIncome>) -> Unit
 ) {
     var name by remember { mutableStateOf(existing?.name ?: "Recebimento avulso") }
     var value by remember { mutableStateOf(existing?.amount?.let { "%.2f".format(it) } ?: "") }
     var date by remember { mutableStateOf(existing?.date ?: LocalDate.now().toString()) }
+    var dates by remember { mutableStateOf(emptyList<String>()) }
     val amount = parseAmount(value)
     val validDate = runCatching { LocalDate.parse(date) }.getOrNull()
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
@@ -1000,12 +1001,40 @@ private fun OneTimeIncomeSheet(
                 value, { value = it }, label = { Text("Valor (R$)") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
             )
-            DateField(date, { date = it }, "Data do recebimento")
+            if (existing == null) {
+                Text(
+                    "Escolha uma ou mais datas. O valor informado será recebido em cada uma.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                DateField(date, { date = it }, "Data para adicionar")
+                OutlinedButton(
+                    enabled = validDate != null && date !in dates,
+                    onClick = { dates = (dates + date).sorted() }
+                ) { Text("Adicionar data") }
+                if (dates.isNotEmpty()) {
+                    Text("Datas selecionadas", style = MaterialTheme.typography.labelLarge)
+                    dates.forEach { selectedDate ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(dayLabel(selectedDate), modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically))
+                            TextButton(onClick = { dates = dates - selectedDate }) { Text("Remover") }
+                        }
+                    }
+                }
+            } else {
+                DateField(date, { date = it }, "Data do recebimento")
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
-                    enabled = name.isNotBlank() && amount != null && amount > 0 && validDate != null,
+                    enabled = name.isNotBlank() && amount != null && amount > 0 &&
+                        (if (existing == null) dates.isNotEmpty() else validDate != null),
                     onClick = {
-                        onSave(OneTimeIncome(existing?.id ?: 0, name.trim(), amount ?: return@Button, validDate.toString()))
+                        val value = amount ?: return@Button
+                        val incomes = if (existing == null) {
+                            dates.map { OneTimeIncome(0, name.trim(), value, it) }
+                        } else {
+                            listOf(existing.copy(name = name.trim(), amount = value, date = validDate.toString()))
+                        }
+                        onSave(incomes)
                         onDismiss()
                     }
                 ) { Text("Salvar") }

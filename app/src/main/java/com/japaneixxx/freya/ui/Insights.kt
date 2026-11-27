@@ -265,10 +265,10 @@ fun buildAgenda(
             val d = incomeDate(i, ym)
             if (!d.isBefore(today) && !d.isAfter(limit)) raw += Raw(d, i.name, i.amount, "INCOME", null)
         }
-        oneTimeIncomes.forEach oneTimeLoop@{ i ->
-            val d = runCatching { LocalDate.parse(i.date) }.getOrNull() ?: return@oneTimeLoop
-            if (!d.isBefore(today) && !d.isAfter(limit)) raw += Raw(d, i.name, i.amount, "INCOME", "Recebimento avulso")
-        }
+    }
+    oneTimeIncomes.forEach oneTimeLoop@{ i ->
+        val d = runCatching { LocalDate.parse(i.date) }.getOrNull() ?: return@oneTimeLoop
+        if (!d.isBefore(today) && !d.isAfter(limit)) raw += Raw(d, i.name, i.amount, "INCOME", "Recebimento avulso")
     }
     accounts.filter { it.type == "CREDIT" && it.balance > 0 }.forEach cardLoop@{ a ->
         val d = a.dueDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return@cardLoop

@@ -7,6 +7,7 @@ import com.japaneixxx.freya.data.Budget
 import com.japaneixxx.freya.data.CAT_OWN_TRANSFER
 import com.japaneixxx.freya.data.Envelope
 import com.japaneixxx.freya.data.Income
+import com.japaneixxx.freya.data.OneTimeIncome
 import com.japaneixxx.freya.data.Rule
 import com.japaneixxx.freya.data.Tx
 import com.japaneixxx.freya.data.ruleKeyFor
@@ -136,6 +137,21 @@ class InsightsTest {
     // ---- agenda do celular ----
     private fun card(id: String, balance: Double, due: String?) =
         Account(id, "i", "Nubank", "Roxinho", "CREDIT", "CREDIT_CARD", balance, "BRL", dueDate = due)
+
+    @Test fun oneTimeIncomeIsAddedToAgendaOnlyOnce() {
+        val income = OneTimeIncome(1, "Freelance", 500.0, LocalDate.now().plusDays(1).toString())
+        val agenda = buildAgenda(
+            bank = 0.0,
+            bills = emptyList(),
+            payments = emptyList(),
+            incomes = emptyList(),
+            accounts = emptyList(),
+            days = 2,
+            oneTimeIncomes = listOf(income)
+        )
+
+        assertEquals(1, agenda.count { it.name == income.name })
+    }
 
     @Test fun calendarWishesListsOnlyUpcomingCardsWithBalance() {
         val today = LocalDate.of(2026, 11, 26)

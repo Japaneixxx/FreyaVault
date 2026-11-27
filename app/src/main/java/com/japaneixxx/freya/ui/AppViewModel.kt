@@ -632,8 +632,12 @@ class AppViewModel(private val app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { dao.deleteIncome(income.id) }
     }
 
-    fun saveOneTimeIncome(income: OneTimeIncome) {
-        viewModelScope.launch { dao.putOneTimeIncome(income) }
+    fun saveOneTimeIncomes(incomes: List<OneTimeIncome>) {
+        viewModelScope.launch {
+            db.withTransaction {
+                incomes.forEach { dao.putOneTimeIncome(it) }
+            }
+        }
     }
 
     fun deleteOneTimeIncome(income: OneTimeIncome) {
