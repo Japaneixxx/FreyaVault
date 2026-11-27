@@ -14,7 +14,7 @@ private fun JSONArray?.objs(): List<JSONObject> =
     if (this == null) emptyList() else List(length()) { getJSONObject(it) }
 
 class PluggyApi(private val clientId: String, private val clientSecret: String) {
-    private val base = "https://api.pluggy.ai"
+    private val base = "/api/pluggy"
     private var apiKey: String = ""
 
     companion object {

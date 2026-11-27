@@ -109,7 +109,7 @@ jobs:
             app/build/outputs/apk/release/app-release.apk.sha256
             freya-web.zip
 
-  # 2. Build Web (WasmJS) e Deploy na Vercel (roda na branch web e também na main)
+  # 2. Build Web (WasmJS), copia o proxy da API do Pluggy e faz Deploy na Vercel
   deploy-web-vercel:
     runs-on: ubuntu-latest
     steps:
@@ -124,6 +124,11 @@ jobs:
 
       - name: Build web (PWA/Wasm) distribution
         run: gradle :app:wasmJsBrowserDistribution --no-daemon
+
+      - name: Prepare Vercel API proxy
+        run: |
+          mkdir -p app/build/dist/wasmJs/productionExecutable/api/pluggy
+          cp "api/pluggy/[...path].js" app/build/dist/wasmJs/productionExecutable/api/pluggy/
 
       - name: Deploy to Vercel
         env:
