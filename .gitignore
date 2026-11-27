@@ -26,6 +26,7 @@ captures/
 # Kotlin
 .kotlin/
 *.kotlin_module
+kotlin-js-store/
 
 # Operating system files
 .DS_Store

@@ -1,3 +1,5 @@
+@file:OptIn(kotlin.ExperimentalStdlibApi::class)
+
 package com.japaneixxx.freya.ui
 
 import android.Manifest
@@ -58,7 +60,7 @@ fun MoreScreen(vm: AppViewModel) {
         if (uri != null) scope.launch {
             runCatching {
                 val json = vm.backupJson(exportPassword)
-                withContext(Dispatchers.IO) {
+                withContext(Dispatchers.Default) {
                     val output = ctx.contentResolver.openOutputStream(uri)
                         ?: error("Não foi possível abrir o arquivo de backup")
                     output.use { it.write(json.toByteArray(Charsets.UTF_8)) }

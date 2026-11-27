@@ -17,7 +17,7 @@ import com.japaneixxx.freya.data.Account
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
-private fun dm(d: LocalDate) = String.format("%02d/%02d", d.dayOfMonth, d.monthValue)
+private fun dm(d: LocalDate) = formatNumber(java.util.Locale.US, "%02d/%02d", d.dayOfMonth, d.monthValue)
 
 private fun dueDayOf(card: Account): Int? =
     card.dueDate?.let { runCatching { LocalDate.parse(it).dayOfMonth }.getOrNull() }

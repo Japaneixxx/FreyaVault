@@ -64,6 +64,8 @@ jobs:
           if [[ ${#bug} -ge 2 ]]; then prerelease=true; fi
           echo "name=$version_name" >> "$GITHUB_OUTPUT"
           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+      - name: Build web (PWA/Wasm) distribution
+        run: gradle :app:wasmJsBrowserDistribution --no-daemon
       - name: Generate APK checksum
         run: |
           cd app/build/outputs/apk/release
@@ -72,6 +74,14 @@ jobs:
         with:
           name: Freya-apk
           path: app/build/outputs/apk/release/app-release.apk
+      - name: Pack web distribution
+        run: |
+          cd app/build/dist/wasmJs/productionExecutable
+          zip -qr "$GITHUB_WORKSPACE/freya-web.zip" .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Freya-web
+          path: freya-web.zip
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
@@ -83,3 +93,4 @@ jobs:
           files: |
             app/build/outputs/apk/release/app-release.apk
             app/build/outputs/apk/release/app-release.apk.sha256
+            freya-web.zip

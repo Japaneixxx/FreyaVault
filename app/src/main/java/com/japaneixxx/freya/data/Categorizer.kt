@@ -67,7 +67,7 @@ private val keywords: List<Pair<String, List<String>>> = listOf(
 
 private fun normalizeText(s: String): String =
     Normalizer.normalize(s.lowercase(), Normalizer.Form.NFD)
-        .replace(Regex("\\p{M}"), "")
+        .replace(Regex("[\\u0300-\\u036f]"), "")
         .replace(Regex("[^a-z ]"), " ")
         .replace(Regex("\\s+"), " ")
         .trim()
@@ -75,7 +75,7 @@ private fun normalizeText(s: String): String =
 /** Para palavras-chave: como [normalizeText], mas mantém dígitos (99app, 99pop). Não serve para chaves de regra. */
 private fun normalizeForMatch(s: String): String =
     Normalizer.normalize(s.lowercase(), Normalizer.Form.NFD)
-        .replace(Regex("\\p{M}"), "")
+        .replace(Regex("[\\u0300-\\u036f]"), "")
         .replace(Regex("[^a-z0-9 ]"), " ")
         .replace(Regex("\\s+"), " ")
         .trim()

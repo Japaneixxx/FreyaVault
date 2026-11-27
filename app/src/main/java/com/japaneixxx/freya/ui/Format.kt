@@ -50,15 +50,15 @@ fun ago(ms: Long): String {
 
 fun weekdayName(d: DayOfWeek): String = d.getDisplayName(TextStyle.FULL, ptBR)
 
-fun pct(v: Double): String = String.format(ptBR, "%.2f%%", v)
+fun pct(v: Double): String = formatNumber(ptBR, "%.2f%%", v)
 
 /** Valor curto com sinal para caber numa célula do calendário: −85, +1,2k, −12k. */
 fun compactMoney(v: Double): String {
     val a = Math.abs(v)
     val body = when {
-        Math.round(a) >= 10_000 -> String.format(ptBR, "%.0fk", a / 1000)
-        Math.round(a) >= 1_000 -> String.format(ptBR, "%.1fk", a / 1000)
-        else -> String.format(ptBR, "%d", Math.round(a))
+        Math.round(a) >= 10_000 -> formatNumber(ptBR, "%.0fk", a / 1000)
+        Math.round(a) >= 1_000 -> formatNumber(ptBR, "%.1fk", a / 1000)
+        else -> formatNumber(ptBR, "%d", Math.round(a))
     }
     return (if (v < 0) "−" else "+") + body
 }

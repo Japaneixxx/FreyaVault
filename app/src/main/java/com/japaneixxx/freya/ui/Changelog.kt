@@ -23,6 +23,10 @@ data class ReleaseNote(
  */
 val releaseNotes: List<ReleaseNote> = listOf(
     ReleaseNote(
+        "1.11.0", "Freya na web",
+        listOf("Versão web (PWA) em beta: abra o Freya no navegador, com os mesmos dados e interface do app. No celular, use o aplicativo para notificações, agenda, widget e atualizações.")
+    ),
+    ReleaseNote(
         "1.10.5", "Retrospectiva mensal e anual",
         listOf("Veja, quando quiser em Mais, um resumo discreto das receitas, despesas e categorias do mês ou do ano. Os dados ficam no aparelho e não geram notificações.")
     ),

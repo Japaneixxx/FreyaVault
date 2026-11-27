@@ -34,7 +34,7 @@ private data class Scenario(val label: String, val net: Double, val invested: Do
 private val EXEMPT_NAME = Regex("LCI|LCA|CRI|CRA|POUPAN|ISENT", RegexOption.IGNORE_CASE)
 
 /** Número com ponto decimal, que o [parseAmount] entende em qualquer idioma do aparelho. */
-private fun fmtNum(v: Double): String = String.format(Locale.US, "%.2f", v)
+private fun fmtNum(v: Double): String = formatNumber(Locale.US, "%.2f", v)
 
 /** Simulador de investimento: juros compostos com aportes, CDI/IPCA, IR regressivo, meta reversa e comparação. */
 @Composable
@@ -72,7 +72,7 @@ fun InvestCalcScreen(vm: AppViewModel, onBack: () -> Unit) {
             val beforeCdi = cdiText
             val beforeIpca = ipcaText
             try {
-                val r = withContext(Dispatchers.IO) { MarketRatesApi.fetch() }
+                val r = withContext(Dispatchers.Default) { MarketRatesApi.fetch() }
                 settings.calcCdi = fmtNum(r.cdi)
                 settings.calcIpca = fmtNum(r.ipca)
                 settings.calcRatesDate = r.cdiDate
